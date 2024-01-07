@@ -1,66 +1,6 @@
-## Foundry
+# Summer LendingDApp
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-Foundry consists of:
+Summer LendingDApp, a decentralized application, enables users to secure USDC loans using various collateral assets, featuring a liqudation factor set at 90%, which is 10% higher than the collateral factor. The collateral asset's price is determined using the Chainlink price oracle. The Dapp incorporates a minimum borrow amount to safeguard against potential fund losses. Moreover, Summer LendingDApp offers user incentives to promote its usage.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Notably, Summer LendingDApp adopts the CompoundV3 minimum borrowing requirement and limits borrowing to a single asset while providing additional incentives to users. It's worth mentioning that the liquidation method employed by Summer LendingDApp differs from that of CompoundV3.
