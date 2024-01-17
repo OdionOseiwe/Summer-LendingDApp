@@ -83,7 +83,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         notZeroAmount(_amount) tokenallowed(_token){
         uint256 collateral = userDeposit[msg.sender][_token].amount;
         require(collateral > 0, "Revert: insufficient funds");
-        require(!userBorrow[_token][msg.sender].borrowed, "Revert: borrowed before");
+        require(!userBorrow[_token][msg.sender].borrowed, "Revert: borrowed before pay back");
         bool allow = borrowAllowed(collateral,_token,_amount);
         require(allow, "Revert: borrowed not allowed");
         userBorrow[_token][msg.sender].amount = _amount;

@@ -73,7 +73,32 @@ contract LendDAppTest is Test {
         console.log(bal);
         vm.stopPrank(); 
 
-     }
+    }
+
+    function test_RevertInsufficientFundsBorrow() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        vm.expectRevert(bytes("Revert: insufficient funds"));  
+        lendingDApp.borrow(0.5e18, WBNB);
+        vm.stopPrank(); 
+    }
+
+    function test_RevertPayBackBorrow() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,10e18);
+        IERC20(WBNB).approve(address(lendingDApp),1e18);
+        lendingDApp.deposit(WBNB, 1e18);
+        uint256 bal = IERC20(WBNB).balanceOf(address(lendingDApp));
+        console.log(bal);
+        mockUSDT.mint(address(lendingDApp), 10e18);
+        lendingDApp.borrow(0.5e18, WBNB);
+        vm.expectRevert(bytes("Revert: borrowed before pay back"));  
+        lendingDApp.borrow(0.5e18, WBNB);
+        vm.stopPrank(); 
+    }
 
     // function testFuzz_SetNumber(uint256 x) public {
     //     LendingDApp.setNumber(x);
