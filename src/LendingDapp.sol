@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.13;
 
 import "./interface/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -47,6 +47,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         uint256 amount;
         uint256 collateralUSDAtBorrowTime;
         bool borrowed;
+        bool liquidated;
     }
     error BorrowNotallowed(uint256 _amount);
 
@@ -67,7 +68,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     /////////////////////////////// MAIN FUNCTIONS /////////////////////////////////////
 
-    function deposit(address _token , uint256 _amount) external  
+    function deposit(address _token , uint256 _amount) public  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
         userDeposit[msg.sender][_token].amount += _amount;
         bool success = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
@@ -92,10 +93,18 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         uint256 collateralValueInUSDAtTimeOfBorrow = getUSDvalue(collateral, _token);
         userBorrow[_token][msg.sender].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
         userBorrow[_token][msg.sender].borrowed = true;
+        userBorrow[_token][msg.sender].liquidated = false;
     }
 
-    function repay(uint256 _amount) external{
-
+    ///@dev when you repay, the user repays in full
+    function repay(uint256 _amount, address _token) external{
+        require(userBorrow[_token][msg.sender].liquidated, "Revert: has been liquidated before");
+        require(userBorrow[_token][msg.sender].amount == _amount, "Revert: User must repay in full");
+        userBorrow[_token][msg.sender].amount = 0;
+        bool success = USDtoken.transferFrom(msg.sender, address(this) ,_amount);
+        require(success, "Revert: transfer Failed");
+        emit repayed(_token,msg.sender,_amount);
+        userBorrow[_token][msg.sender].borrowed = false;
     }
 
     function liquidate(address _token ,address _account) external
@@ -109,7 +118,9 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         userBorrow[_token][_account].amount = 0;
         bool success = USDtoken.transferFrom(msg.sender, address(this) ,pay);
         require(success, "Revert: transfer Failed");
+        emit liquidated(_token, _account, pay);
         transferFunds(_token, collateral);
+        userBorrow[_token][_account].liquidated = true;
         userBorrow[_token][_account].borrowed = false;
     }
 
@@ -117,6 +128,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev withdraw deposits with all the rewards accomulated 
     function withdraw(address _token, uint256 _amount) external  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
+        require(!userBorrow[_token][msg.sender].borrowed, "Revert: You borrowed reapy first");
+        require(userDeposit[msg.sender][_token].amount > 0, "Revert: did not deposit");
         userDeposit[msg.sender][_token].amount -= _amount;
         transferFunds(_token,_amount);
         uint256 rewards =  UserRewards[msg.sender][_token];
@@ -190,7 +203,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     }
 
     modifier addressZero(address _address){
-        require(_address != address(0), "Revert address zero not allowes");
+        require(_address != address(0), "Revert address zero not allowed");
         _;
     }
 
