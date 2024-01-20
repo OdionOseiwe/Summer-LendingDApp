@@ -136,7 +136,7 @@ contract LendDAppTest is Test {
         mockUSDT.mint(address(lendingDApp), 10000e18);
         summerToken.mint(address(lendingDApp), 10000e18);
         lendingDApp.borrow(200e18, WBNB);
-        vm.expectRevert(bytes("Revert: You borrowed reapy first"));
+        vm.expectRevert(bytes("Revert: You borrowed repay first"));
         lendingDApp.withdraw(WBNB,2e18);
     }
 
@@ -146,7 +146,7 @@ contract LendDAppTest is Test {
         vm.startPrank(depositor1);
         mockUSDT.mint(address(lendingDApp), 10000e18);
         summerToken.mint(address(lendingDApp), 10000e18);
-        vm.expectRevert(bytes("Revert: did not deposit"));
+        vm.expectRevert(bytes("Revert: Amount to withdraw in high"));
         lendingDApp.withdraw(WBNB,2e18);
     }
 
@@ -154,16 +154,34 @@ contract LendDAppTest is Test {
         vm.prank(owner);
         lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
         vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        deal(WBNB,depositor1,4e18);
+        IERC20(WBNB).approve(address(lendingDApp),4e18);
         lendingDApp.deposit(WBNB, 2e18);
         lendingDApp.userDeposit(depositor1,WBNB);
         summerToken.mint(address(lendingDApp), 10000e18);
+        skip(86400);
+        lendingDApp.deposit(WBNB, 2e18);
+        skip(1209600);
         lendingDApp.withdraw(WBNB,2e18);
         lendingDApp.userDeposit(depositor1,WBNB);
         uint256 balOfDepositor = IERC20(summerToken).balanceOf(depositor1);
-        uint256 balOfLendingDApp = IERC20(summerToken).balanceOf(address(lendingDApp));
+        uint256 balOfLendingDApp = IERC20(WBNB).balanceOf(depositor1);
+    }    
+
+    function test_RevertDidNotDepositAmount() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,4e18);
+        IERC20(WBNB).approve(address(lendingDApp),2e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        summerToken.mint(address(lendingDApp), 10000e18);
+        skip(1209600);
+        vm.expectRevert(bytes("Revert: Amount to withdraw in high"));
+        lendingDApp.withdraw(WBNB,3e18);
     }
+
+
 
     // function testFuzz_SetNumber(uint256 x) public {
     //     LendingDApp.setNumber(x);

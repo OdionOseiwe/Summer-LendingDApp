@@ -131,8 +131,9 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev withdraw deposits with all the rewards accomulated 
     function withdraw(address _token, uint256 _amount) external  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
-        require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed reapy first");
-        require(userDeposit[msg.sender][_token].amount > 0, "Revert: did not deposit");
+        require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed repay first");
+        require(userDeposit[msg.sender][_token].amount >=_amount, "Revert: Amount to withdraw in high");
+        //check if the desposit in lesseer than what he wants to borrow
         userDeposit[msg.sender][_token].amount -= _amount;
         transferFunds(_token,_amount);
         uint256 rewards =  UserRewards[msg.sender][_token];
