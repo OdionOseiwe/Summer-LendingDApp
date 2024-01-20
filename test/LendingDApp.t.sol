@@ -15,11 +15,15 @@ contract LendDAppTest is Test {
     MockUSDT public mockUSDT;
     SummerToken public summerToken;
     address public WBNB = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd;
-    address public RichGuy = 0x192D4064ec4645d1A3ea86F6f6BeEd237f102173;
     address public BNB_USDPriceFeed = 0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526;
     address depositor1 = mkaddr("depositor1");
     address depositor2 = mkaddr("depositor2");
     address owner = mkaddr("owner");
+
+    struct userDepositContainer{
+        uint256 amount;
+        uint256 depositTime;
+    }
 
     // tests are ran on binance testnet
     function setUp() public {
@@ -30,7 +34,7 @@ contract LendDAppTest is Test {
     }
 
     function test_ShouldRevertNotOwnerwhiteListToken() public {
-        vm.startPrank(RichGuy);
+        vm.startPrank(depositor1);
         vm.expectRevert();
         lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
         vm.stopPrank();
@@ -56,7 +60,7 @@ contract LendDAppTest is Test {
     }
 
     function test_DepositRevertNotWhitelisted() public {
-       vm.startPrank(RichGuy);
+       vm.startPrank(depositor1);
        vm.expectRevert(bytes("Revert: not whitelisted"));
        lendingDApp.deposit(WBNB,1e18);
        vm.stopPrank(); 
@@ -89,15 +93,76 @@ contract LendDAppTest is Test {
         lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
         vm.startPrank(depositor1);
         deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),1e18);
-        lendingDApp.deposit(WBNB, 1e18);
+        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        lendingDApp.deposit(WBNB, 2e18);
         uint256 bal = IERC20(WBNB).balanceOf(address(lendingDApp));
         console.log(bal);
-        mockUSDT.mint(address(lendingDApp), 10e18);
-        lendingDApp.borrow(0.5e18, WBNB);
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(300e18, WBNB);
         vm.expectRevert(bytes("Revert: borrowed before pay back"));  
-        lendingDApp.borrow(0.5e18, WBNB);
+        lendingDApp.borrow(1e18, WBNB);
         vm.stopPrank(); 
+    }
+
+    function test_USDValue() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        uint256 price =lendingDApp.getUSDvalue(1e18,WBNB);
+        console.log(price);
+        vm.stopPrank();
+    }
+
+    function test_RevertReduceAmounttoBorrow() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,10e18);
+        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        vm.expectRevert(bytes("Revert: Reduce amount to borrow"));  
+        lendingDApp.borrow(600e18, WBNB);
+        vm.stopPrank(); 
+    }
+
+    function test_RevertPayBorrowB4Withdrawal() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,10e18);
+        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        summerToken.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        vm.expectRevert(bytes("Revert: You borrowed reapy first"));
+        lendingDApp.withdraw(WBNB,2e18);
+    }
+
+    function test_RevertDidNotDeposit() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        summerToken.mint(address(lendingDApp), 10000e18);
+        vm.expectRevert(bytes("Revert: did not deposit"));
+        lendingDApp.withdraw(WBNB,2e18);
+    }
+
+    function test_WithrawDeposits() public {
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,10e18);
+        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        lendingDApp.userDeposit(depositor1,WBNB);
+        summerToken.mint(address(lendingDApp), 10000e18);
+        lendingDApp.withdraw(WBNB,2e18);
+        lendingDApp.userDeposit(depositor1,WBNB);
+        uint256 balOfDepositor = IERC20(summerToken).balanceOf(depositor1);
+        uint256 balOfLendingDApp = IERC20(summerToken).balanceOf(address(lendingDApp));
     }
 
     // function testFuzz_SetNumber(uint256 x) public {

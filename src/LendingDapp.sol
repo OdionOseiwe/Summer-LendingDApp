@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
+
 contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     ///@dev to store the priceFeed for the whiteListed tokens
@@ -15,6 +16,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev only owner can update this
     mapping(address => bool) whiteListedTokens;
 
+    ///@dev borrowerAddress => CollateralAddress => Container
     mapping(address => mapping(address => userBorrowContainer)) public userBorrow;
 
     mapping(address => mapping(address => userDepositContainer)) public userDeposit;
@@ -79,32 +81,33 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     ///@dev the token to borrow is USD so no need to convert
     /// stores the collateral amount in USD for furture use
+    /// The users inputs the amount of USD he wants to borrow and its compared to the collateral value in USD
     function borrow(uint256 _amount, address _token) external
         notZeroAmount(_amount) tokenallowed(_token){
         uint256 collateral = userDeposit[msg.sender][_token].amount;
         require(collateral > 0, "Revert: insufficient funds");
-        require(!userBorrow[_token][msg.sender].borrowed, "Revert: borrowed before pay back");
+        require(!userBorrow[msg.sender][_token].borrowed, "Revert: borrowed before pay back");
         bool allow = borrowAllowed(collateral,_token,_amount);
         require(allow, "Revert: borrowed not allowed");
-        userBorrow[_token][msg.sender].amount = _amount;
+        userBorrow[msg.sender][_token].amount = _amount;
         bool success = USDtoken.transfer(msg.sender , _amount);
         require(success, "Revert: Deposit Failed");
         emit borrowed(msg.sender,_amount);
         uint256 collateralValueInUSDAtTimeOfBorrow = getUSDvalue(collateral, _token);
-        userBorrow[_token][msg.sender].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
-        userBorrow[_token][msg.sender].borrowed = true;
-        userBorrow[_token][msg.sender].liquidated = false;
+        userBorrow[msg.sender][_token].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
+        userBorrow[msg.sender][_token].borrowed = true;
+        userBorrow[msg.sender][_token].liquidated = false;
     }
 
     ///@dev when you repay, the user repays in full
     function repay(uint256 _amount, address _token) external{
-        require(userBorrow[_token][msg.sender].liquidated, "Revert: has been liquidated before");
-        require(userBorrow[_token][msg.sender].amount == _amount, "Revert: User must repay in full");
-        userBorrow[_token][msg.sender].amount = 0;
+        require(userBorrow[msg.sender][_token].liquidated, "Revert: has been liquidated before");
+        require(userBorrow[msg.sender][_token].amount == _amount, "Revert: User must repay in full");
+        userBorrow[msg.sender][_token].amount = 0;
         bool success = USDtoken.transferFrom(msg.sender, address(this) ,_amount);
         require(success, "Revert: transfer Failed");
         emit repayed(_token,msg.sender,_amount);
-        userBorrow[_token][msg.sender].borrowed = false;
+        userBorrow[msg.sender][_token].borrowed = false;
     }
 
     function liquidate(address _token ,address _account) external
@@ -128,7 +131,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev withdraw deposits with all the rewards accomulated 
     function withdraw(address _token, uint256 _amount) external  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
-        require(!userBorrow[_token][msg.sender].borrowed, "Revert: You borrowed reapy first");
+        require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed reapy first");
         require(userDeposit[msg.sender][_token].amount > 0, "Revert: did not deposit");
         userDeposit[msg.sender][_token].amount -= _amount;
         transferFunds(_token,_amount);
@@ -149,10 +152,13 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     ////////////////////////////////////// HELPERS //////////////////////////////////
 
-    function getUSDvalue(uint256 _collateralValue, address _token) view private returns(uint256 ){
+    //the protocol whitelistens any token to collect as collateral and only gives USDC tokens
+    // the protocol gets its price for any token from chainlink price oracle
+    function getUSDvalue(uint256 _collateralValue, address _token) view public returns(uint256 ){
         AggregatorV3Interface  dataFeed = AggregatorV3Interface(tokenToChainlinkPriceFeed[_token]);
         (,int256 price,,,) = dataFeed.latestRoundData();
-        return (uint256(price) * _collateralValue) / 1e18;
+        /// the figures from chainlink price oracle is divided by 1e8 to make all the tokens in 1e18 to easy conversions
+        return (uint256(price) * _collateralValue)/ 1e8;
     }
 
     ///@return uint256 80% of the collateral 
@@ -174,7 +180,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         return true;
     }
 
-    function borrowAllowed(uint256 _collateralValue, address _token, uint amountToBorrow) view private returns(bool allow){
+    function borrowAllowed(uint256 _collateralValue, address _token, uint amountToBorrow) view public returns(bool allow){
         uint256 collateral = getUSDvalue(_collateralValue,_token);
         uint256 threshold = calculateCollateralThreshold(collateral);
         require(amountToBorrow <= threshold, "Revert: Reduce amount to borrow");
