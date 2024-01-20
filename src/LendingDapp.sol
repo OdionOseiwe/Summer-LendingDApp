@@ -100,8 +100,9 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     }
 
     ///@dev when you repay, the user repays in full
-    function repay(uint256 _amount, address _token) external{
-        require(userBorrow[msg.sender][_token].liquidated, "Revert: has been liquidated before");
+    function repay(uint256 _amount, address _token) external 
+        notZeroAmount(_amount) tokenallowed(_token){
+        require(!userBorrow[msg.sender][_token].liquidated, "Revert: has been liquidated before");
         require(userBorrow[msg.sender][_token].amount == _amount, "Revert: User must repay in full");
         userBorrow[msg.sender][_token].amount = 0;
         bool success = USDtoken.transferFrom(msg.sender, address(this) ,_amount);
@@ -111,7 +112,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     }
 
     function liquidate(address _token ,address _account) external
-        tokenallowed(_token){
+        tokenallowed(_token) addressZero(_account){
         uint256 collateral = userDeposit[_account][_token].amount;
         require(collateral > 0, "choose another token to liqudate");
         bool allow = liquidateAllowed(collateral,_token, _account);

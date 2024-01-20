@@ -181,12 +181,50 @@ contract LendDAppTest is Test {
         lendingDApp.withdraw(WBNB,3e18);
     }
 
+    function test_RevertTokenNotAllowed() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,10e18);
+        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        vm.expectRevert(bytes("Revert: not whitelisted"));
+        lendingDApp.repay(200e18,BNB_USDPriceFeed);
+    }
+
+    function test_RevertShouldRepayTheFullAmountBorrowed() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,10e18);
+        IERC20(WBNB).approve(address(lendingDApp),3e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        vm.expectRevert(bytes("Revert: User must repay in full"));
+        lendingDApp.repay(100e18,WBNB);
+    }
+
+    function test_Repay() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,2e18);
+        IERC20(WBNB).approve(address(lendingDApp),2e18);
+        lendingDApp.deposit(WBNB, 2e18);
+        IERC20(WBNB).balanceOf(depositor1); //check if it left user wallet
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        IERC20(mockUSDT).balanceOf(depositor1); //check if the amount came into the user wallet
+        skip(1209600);
+        IERC20(mockUSDT).approve(address(lendingDApp), 200e18);
+        lendingDApp.repay(200e18,WBNB);
+        IERC20(mockUSDT).balanceOf(address(lendingDApp)); //check if the USD is present in the contract
+    }
 
 
-    // function testFuzz_SetNumber(uint256 x) public {
-    //     LendingDApp.setNumber(x);
-    //     assertEq(LendingDApp.number(), x);
-    // }
     function mkaddr(string memory name) public returns (address) {
         address addr = address(uint160(uint256(keccak256(abi.encodePacked(name)))));
         vm.label(addr, name);
