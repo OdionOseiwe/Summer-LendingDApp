@@ -88,7 +88,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         require(collateral > 0, "Revert: insufficient funds");
         require(!userBorrow[msg.sender][_token].borrowed, "Revert: borrowed before pay back");
         bool allow = borrowAllowed(collateral,_token,_amount);
-        require(allow, "Revert: borrowed not allowed");
+        require(allow, "Revert: borrowed not allowed"); // this line is not really needed
         userBorrow[msg.sender][_token].amount = _amount;
         bool success = USDtoken.transfer(msg.sender , _amount);
         require(success, "Revert: Deposit Failed");
@@ -116,16 +116,16 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         uint256 collateral = userDeposit[_account][_token].amount;
         require(collateral > 0, "choose another token to liqudate");
         bool allow = liquidateAllowed(collateral,_token, _account);
-        require(allow, "account cant be liquidated");
-        uint256 discount = (userBorrow[_token][_account].amount * LIQUIDATIONREWARDS)/ 100;
-        uint256 pay = userBorrow[_token][_account].amount - discount;
-        userBorrow[_token][_account].amount = 0;
+        require(allow, "account can't be liquidated"); // this line is not really needed
+        uint256 discount = (userBorrow[_account][_token].amount * LIQUIDATIONREWARDS)/ 100;
+        uint256 pay = userBorrow[_account][_token].amount - discount;
+        userBorrow[_account][_token].amount = 0;
         bool success = USDtoken.transferFrom(msg.sender, address(this) ,pay);
         require(success, "Revert: transfer Failed");
         emit liquidated(_token, _account, pay);
         transferFunds(_token, collateral);
-        userBorrow[_token][_account].liquidated = true;
-        userBorrow[_token][_account].borrowed = false;
+        userBorrow[_account][_token].liquidated = true;
+        userBorrow[_account][_token].borrowed = false;
     }
 
 
@@ -174,11 +174,11 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         require(done, "Revert: transfer Failed");
     }
 
-    function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view private returns(bool allow){
+    function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view public returns(bool allow){
         uint256 currentCollateralPrice = getUSDvalue(_collateralValue,_token);
-        uint256 previousCollateralPrice = userBorrow[_token][borrower].collateralUSDAtBorrowTime;
+        uint256 previousCollateralPrice = userBorrow[borrower][_token].collateralUSDAtBorrowTime;
         uint256 threshold = (previousCollateralPrice * LIQUIDATIONFACTOR) / 100;
-        require(threshold <= currentCollateralPrice);
+        require(currentCollateralPrice <= threshold, "Revert: 90% not reached");
         return true;
     }
 

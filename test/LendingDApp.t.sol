@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 import {LendingDApp} from "../src/LendingDapp.sol";
 import  "../src/Mock/MockUSDT.sol";
 import  "../src/Mock/SummerToken.sol";
+import "../src/Mock/ChainLinkMock.sol";
 import "../src/interface/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -14,6 +15,7 @@ contract LendDAppTest is Test {
     LendingDApp public lendingDApp;
     MockUSDT public mockUSDT;
     SummerToken public summerToken;
+    MockPriceFeed public mockPriceFeed;
     address public WBNB = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd;
     address public BNB_USDPriceFeed = 0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526;
     address depositor1 = mkaddr("depositor1");
@@ -29,6 +31,7 @@ contract LendDAppTest is Test {
     function setUp() public {
         mockUSDT = new MockUSDT();
         summerToken = new SummerToken();
+        mockPriceFeed = new MockPriceFeed();
         lendingDApp = new LendingDApp(address(mockUSDT), address(summerToken));
         lendingDApp.transferOwnership(owner);
     }
@@ -224,6 +227,68 @@ contract LendDAppTest is Test {
         IERC20(mockUSDT).balanceOf(address(lendingDApp)); //check if the USD is present in the contract
     }
 
+    function test_liquidate() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, address(mockPriceFeed));
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,1e18);
+        IERC20(WBNB).approve(address(lendingDApp),1e18);
+        lendingDApp.deposit(WBNB, 1e18);
+        IERC20(WBNB).balanceOf(depositor1); //check if it left user wallet
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        IERC20(mockUSDT).balanceOf(depositor1); //check if the amount came into the user wallet
+        skip(1209600);
+        vm.startPrank(depositor2);
+        mockUSDT.mint(depositor2, 1000e18);
+        IERC20(mockUSDT).approve(address(lendingDApp), 500e18);
+        mockPriceFeed.changePrice(11781040000); //mockChainlink changes the price of WETH for liquidation
+        lendingDApp.liquidate(WBNB,address(depositor1));
+        IERC20(WBNB).balanceOf(depositor2);
+        mockUSDT.balanceOf(depositor2);
+        lendingDApp.userBorrow(depositor1,WBNB);
+        vm.stopPrank();
+    }
+
+    function test_accountCantBeliquidate() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, address(mockPriceFeed));
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,1e18);
+        IERC20(WBNB).approve(address(lendingDApp),1e18);
+        lendingDApp.deposit(WBNB, 1e18);
+        IERC20(WBNB).balanceOf(depositor1); //check if it left user wallet
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        IERC20(mockUSDT).balanceOf(depositor1); //check if the amount came into the user wallet
+        skip(1209600);
+        vm.startPrank(depositor2);
+        mockUSDT.mint(depositor2, 1000e18);
+        IERC20(mockUSDT).approve(address(lendingDApp), 500e18);
+        vm.expectRevert(bytes("Revert: 90% not reached"));
+        lendingDApp.liquidate(WBNB,depositor1);
+        vm.stopPrank();
+    }
+
+    function test_chooseAnotherAccountToLiquidate() public{
+        vm.prank(owner);
+        lendingDApp.whitelistToken(WBNB, address(mockPriceFeed));
+        vm.startPrank(depositor1);
+        deal(WBNB,depositor1,1e18);
+        IERC20(WBNB).approve(address(lendingDApp),1e18);
+        lendingDApp.deposit(WBNB, 1e18);
+        IERC20(WBNB).balanceOf(depositor1); //check if it left user wallet
+        mockUSDT.mint(address(lendingDApp), 10000e18);
+        lendingDApp.borrow(200e18, WBNB);
+        IERC20(mockUSDT).balanceOf(depositor1); //check if the amount came into the user wallet
+        skip(1209600);
+        vm.startPrank(depositor2);
+        mockUSDT.mint(depositor2, 1000e18);
+        IERC20(mockUSDT).approve(address(lendingDApp), 500e18);
+        vm.expectRevert(bytes("choose another token to liqudate"));
+        lendingDApp.liquidate(WBNB,owner);
+        vm.stopPrank();
+    }
 
     function mkaddr(string memory name) public returns (address) {
         address addr = address(uint160(uint256(keccak256(abi.encodePacked(name)))));
