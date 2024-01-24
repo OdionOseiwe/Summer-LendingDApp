@@ -182,7 +182,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         return true;
     }
 
-    function borrowAllowed(uint256 _collateralValue, address _token, uint amountToBorrow) view public returns(bool allow){
+    function borrowAllowed(uint256 _collateralValue, address _token, uint256 amountToBorrow) view public returns(bool allow){
         uint256 collateral = getUSDvalue(_collateralValue,_token);
         uint256 threshold = calculateCollateralThreshold(collateral);
         require(amountToBorrow <= threshold, "Revert: Reduce amount to borrow");
