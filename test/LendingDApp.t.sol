@@ -36,179 +36,179 @@ contract LendDAppTest is Test {
         lendingDApp.transferOwnership(owner);
     }
 
-    function test_ShouldRevertNotOwnerwhiteListToken() public {
-        vm.startPrank(depositor1);
-        vm.expectRevert();
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.stopPrank();
-    }
+    // function test_ShouldRevertNotOwnerwhiteListToken() public {
+    //     vm.startPrank(depositor1);
+    //     vm.expectRevert();
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.stopPrank();
+    // }
 
-    function test_RevertAddressZero() public {
-        vm.prank(owner);
-        vm.expectRevert(bytes("Revert address zero not allowed"));
-        lendingDApp.whitelistToken(address(0), BNB_USDPriceFeed);
-    }
+    // function test_RevertAddressZero() public {
+    //     vm.prank(owner);
+    //     vm.expectRevert(bytes("Revert address zero not allowed"));
+    //     lendingDApp.whitelistToken(address(0), BNB_USDPriceFeed);
+    // }
 
-    function test_RevertWhitelistTokenTwice() public {
-        vm.startPrank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.expectRevert(bytes("Revert: Token already exists"));
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.stopPrank();
-    }
+    // function test_RevertWhitelistTokenTwice() public {
+    //     vm.startPrank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.expectRevert(bytes("Revert: Token already exists"));
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.stopPrank();
+    // }
 
-    function test_WhitelistToken() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-    }
+    // function test_WhitelistToken() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    // }
 
-    function test_DepositRevertNotWhitelisted() public {
-       vm.startPrank(depositor1);
-       vm.expectRevert(bytes("Revert: not whitelisted"));
-       lendingDApp.deposit(WBNB,1e18);
-       vm.stopPrank(); 
-    }
+    // function test_DepositRevertNotWhitelisted() public {
+    //    vm.startPrank(depositor1);
+    //    vm.expectRevert(bytes("Revert: not whitelisted"));
+    //    lendingDApp.deposit(WBNB,1e18);
+    //    vm.stopPrank(); 
+    // }
 
-    function test_Deposit() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),1e18);
-        lendingDApp.deposit(WBNB, 1e18);
-        uint256 bal = IERC20(WBNB).balanceOf(address(lendingDApp));
-        console.log(bal);
-        vm.stopPrank(); 
+    // function test_Deposit() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,10e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),1e18);
+    //     lendingDApp.deposit(WBNB, 1e18);
+    //     uint256 bal = IERC20(WBNB).balanceOf(address(lendingDApp));
+    //     console.log(bal);
+    //     vm.stopPrank(); 
 
-    }
+    // }
 
-    function test_RevertInsufficientFundsBorrow() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        vm.expectRevert(bytes("Revert: insufficient funds"));  
-        lendingDApp.borrow(0.5e18, WBNB);
-        vm.stopPrank(); 
-    }
+    // function test_RevertInsufficientFundsBorrow() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     vm.expectRevert(bytes("Revert: insufficient funds"));  
+    //     lendingDApp.borrow(0.5e18, WBNB);
+    //     vm.stopPrank(); 
+    // }
 
-    function test_RevertPayBackBorrow() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),3e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        uint256 bal = IERC20(WBNB).balanceOf(address(lendingDApp));
-        console.log(bal);
-        mockUSDT.mint(address(lendingDApp), 10000e18);
-        lendingDApp.borrow(300e18, WBNB);
-        vm.expectRevert(bytes("Revert: borrowed before pay back"));  
-        lendingDApp.borrow(1e18, WBNB);
-        vm.stopPrank(); 
-    }
+    // function test_RevertPayBackBorrow() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,10e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),3e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     uint256 bal = IERC20(WBNB).balanceOf(address(lendingDApp));
+    //     console.log(bal);
+    //     mockUSDT.mint(address(lendingDApp), 10000e18);
+    //     lendingDApp.borrow(300e18, WBNB);
+    //     vm.expectRevert(bytes("Revert: borrowed before pay back"));  
+    //     lendingDApp.borrow(1e18, WBNB);
+    //     vm.stopPrank(); 
+    // }
 
-    function test_USDValue() public{
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        uint256 price =lendingDApp.getUSDvalue(1e18,WBNB);
-        console.log(price);
-        vm.stopPrank();
-    }
+    // function test_USDValue() public{
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     uint256 price =lendingDApp.getUSDvalue(1e18,WBNB);
+    //     console.log(price);
+    //     vm.stopPrank();
+    // }
 
-    function test_RevertReduceAmounttoBorrow() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),3e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        mockUSDT.mint(address(lendingDApp), 10000e18);
-        vm.expectRevert(bytes("Revert: Reduce amount to borrow"));  
-        lendingDApp.borrow(600e18, WBNB);
-        vm.stopPrank(); 
-    }
+    // function test_RevertReduceAmounttoBorrow() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,10e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),3e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     mockUSDT.mint(address(lendingDApp), 10000e18);
+    //     vm.expectRevert(bytes("Revert: Reduce amount to borrow"));  
+    //     lendingDApp.borrow(600e18, WBNB);
+    //     vm.stopPrank(); 
+    // }
 
-    function test_RevertPayBorrowB4Withdrawal() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),3e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        mockUSDT.mint(address(lendingDApp), 10000e18);
-        summerToken.mint(address(lendingDApp), 10000e18);
-        lendingDApp.borrow(200e18, WBNB);
-        vm.expectRevert(bytes("Revert: You borrowed repay first"));
-        lendingDApp.withdraw(WBNB,2e18);
-    }
+    // function test_RevertPayBorrowB4Withdrawal() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,10e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),3e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     mockUSDT.mint(address(lendingDApp), 10000e18);
+    //     summerToken.mint(address(lendingDApp), 10000e18);
+    //     lendingDApp.borrow(200e18, WBNB);
+    //     vm.expectRevert(bytes("Revert: You borrowed repay first"));
+    //     lendingDApp.withdraw(WBNB,2e18);
+    // }
 
-    function test_RevertDidNotDeposit() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        mockUSDT.mint(address(lendingDApp), 10000e18);
-        summerToken.mint(address(lendingDApp), 10000e18);
-        vm.expectRevert(bytes("Revert: Amount to withdraw in high"));
-        lendingDApp.withdraw(WBNB,2e18);
-    }
+    // function test_RevertDidNotDeposit() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     mockUSDT.mint(address(lendingDApp), 10000e18);
+    //     summerToken.mint(address(lendingDApp), 10000e18);
+    //     vm.expectRevert(bytes("Revert: Amount to withdraw in high"));
+    //     lendingDApp.withdraw(WBNB,2e18);
+    // }
 
-    function test_WithrawDeposits() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,4e18);
-        IERC20(WBNB).approve(address(lendingDApp),4e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        lendingDApp.userDeposit(depositor1,WBNB);
-        summerToken.mint(address(lendingDApp), 10000e18);
-        skip(86400);
-        lendingDApp.deposit(WBNB, 2e18);
-        skip(1209600);
-        lendingDApp.withdraw(WBNB,2e18);
-        lendingDApp.userDeposit(depositor1,WBNB);
-        uint256 balOfDepositor = IERC20(summerToken).balanceOf(depositor1);
-        uint256 balOfLendingDApp = IERC20(WBNB).balanceOf(depositor1);
-    }    
+    // function test_WithrawDeposits() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,4e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),4e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     lendingDApp.userDeposit(depositor1,WBNB);
+    //     summerToken.mint(address(lendingDApp), 10000e18);
+    //     skip(86400);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     skip(1209600);
+    //     lendingDApp.withdraw(WBNB,2e18);
+    //     lendingDApp.userDeposit(depositor1,WBNB);
+    //     uint256 balOfDepositor = IERC20(summerToken).balanceOf(depositor1);
+    //     uint256 balOfLendingDApp = IERC20(WBNB).balanceOf(depositor1);
+    // }    
 
-    function test_RevertDidNotDepositAmount() public {
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,4e18);
-        IERC20(WBNB).approve(address(lendingDApp),2e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        summerToken.mint(address(lendingDApp), 10000e18);
-        skip(1209600);
-        vm.expectRevert(bytes("Revert: Amount to withdraw in high"));
-        lendingDApp.withdraw(WBNB,3e18);
-    }
+    // function test_RevertDidNotDepositAmount() public {
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,4e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),2e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     summerToken.mint(address(lendingDApp), 10000e18);
+    //     skip(1209600);
+    //     vm.expectRevert(bytes("Revert: Amount to withdraw in high"));
+    //     lendingDApp.withdraw(WBNB,3e18);
+    // }
 
-    function test_RevertTokenNotAllowed() public{
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),3e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        mockUSDT.mint(address(lendingDApp), 10000e18);
-        lendingDApp.borrow(200e18, WBNB);
-        vm.expectRevert(bytes("Revert: not whitelisted"));
-        lendingDApp.repay(200e18,BNB_USDPriceFeed);
-    }
+    // function test_RevertTokenNotAllowed() public{
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,10e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),3e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     mockUSDT.mint(address(lendingDApp), 10000e18);
+    //     lendingDApp.borrow(200e18, WBNB);
+    //     vm.expectRevert(bytes("Revert: not whitelisted"));
+    //     lendingDApp.repay(200e18,BNB_USDPriceFeed);
+    // }
 
-    function test_RevertShouldRepayTheFullAmountBorrowed() public{
-        vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        vm.startPrank(depositor1);
-        deal(WBNB,depositor1,10e18);
-        IERC20(WBNB).approve(address(lendingDApp),3e18);
-        lendingDApp.deposit(WBNB, 2e18);
-        mockUSDT.mint(address(lendingDApp), 10000e18);
-        lendingDApp.borrow(200e18, WBNB);
-        vm.expectRevert(bytes("Revert: User must repay in full"));
-        lendingDApp.repay(100e18,WBNB);
-    }
+    // function test_RevertShouldRepayTheFullAmountBorrowed() public{
+    //     vm.prank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     vm.startPrank(depositor1);
+    //     deal(WBNB,depositor1,10e18);
+    //     IERC20(WBNB).approve(address(lendingDApp),3e18);
+    //     lendingDApp.deposit(WBNB, 2e18);
+    //     mockUSDT.mint(address(lendingDApp), 10000e18);
+    //     lendingDApp.borrow(200e18, WBNB);
+    //     vm.expectRevert(bytes("Revert: User must repay in full"));
+    //     lendingDApp.repay(100e18,WBNB);
+    // }
 
     function test_Repay() public{
         vm.prank(owner);

@@ -5,6 +5,7 @@ import "./interface/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/safeERC20.sol";
 
 
 
@@ -38,6 +39,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     IERC20 public immutable USDtoken;
 
     IERC20 public immutable SummerToken;
+
+    using SafeERC20 for IERC20;
 
     ///@dev blockNumber is to calculate user incentive from the time he deposit
     struct userDepositContainer{
@@ -73,8 +76,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     function deposit(address _token , uint256 _amount) public  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
         userDeposit[msg.sender][_token].amount += _amount;
-        bool success = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-        require(success, "Revert: Deposit Failed");
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         emit deposited(_token, msg.sender, _amount);
 
     }
@@ -90,23 +92,21 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         bool allow = borrowAllowed(collateral,_token,_amount);
         require(allow, "Revert: borrowed not allowed"); // this line is not really needed
         userBorrow[msg.sender][_token].amount = _amount;
-        bool success = USDtoken.transfer(msg.sender , _amount);
-        require(success, "Revert: Deposit Failed");
+        USDtoken.safeTransfer(msg.sender , _amount);
         emit borrowed(msg.sender,_amount);
         uint256 collateralValueInUSDAtTimeOfBorrow = getUSDvalue(collateral, _token);
         userBorrow[msg.sender][_token].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
-        userBorrow[msg.sender][_token].borrowed = true;
-        userBorrow[msg.sender][_token].liquidated = false;
+        userBorrow[msg.sender][_token].borrowed = true; // no need to store borrowed . check borrowed amount
+        userBorrow[msg.sender][_token].liquidated = false;  
     }
 
     ///@dev when you repay, the user repays in full
     function repay(uint256 _amount, address _token) external 
         notZeroAmount(_amount) tokenallowed(_token){
-        require(!userBorrow[msg.sender][_token].liquidated, "Revert: has been liquidated before");
+        require(!userBorrow[msg.sender][_token].liquidated, "Revert: has been liquidated before"); // liquiated is not needed 
         require(userBorrow[msg.sender][_token].amount == _amount, "Revert: User must repay in full");
         userBorrow[msg.sender][_token].amount = 0;
-        bool success = USDtoken.transferFrom(msg.sender, address(this) ,_amount);
-        require(success, "Revert: transfer Failed");
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         emit repayed(_token,msg.sender,_amount);
         userBorrow[msg.sender][_token].borrowed = false;
     }
@@ -119,9 +119,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         require(allow, "account can't be liquidated"); // this line is not really needed
         uint256 discount = (userBorrow[_account][_token].amount * LIQUIDATIONREWARDS)/ 100;
         uint256 pay = userBorrow[_account][_token].amount - discount;
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), pay);
         userBorrow[_account][_token].amount = 0;
-        bool success = USDtoken.transferFrom(msg.sender, address(this) ,pay);
-        require(success, "Revert: transfer Failed");
         emit liquidated(_token, _account, pay);
         transferFunds(_token, collateral);
         userBorrow[_account][_token].liquidated = true;
@@ -140,8 +139,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         uint256 rewards =  UserRewards[msg.sender][_token];
         UserRewards[msg.sender][_token] = 0;
         require(SummerToken.balanceOf(address(this)) >= rewards, "insuffient rewards");
-        bool done = SummerToken.transfer(msg.sender , rewards);
-        require(done, "Revert: transfer Failed");
+        SummerToken.safeTransfer(msg.sender , _amount);
         emit withdrawed(_token, msg.sender, _amount);
     }
 
@@ -170,8 +168,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     function transferFunds(address _token,uint256 _amount) private{
         require(IERC20(_token).balanceOf(address(this)) >= _amount, "insuffient funds");
-        bool done = IERC20(_token).transfer(msg.sender , _amount);
-        require(done, "Revert: transfer Failed");
+        IERC20(_token).safeTransfer(msg.sender , _amount);
     }
 
     function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view public returns(bool allow){
@@ -194,7 +191,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         uint256 duration = userDeposit[msg.sender][_token].depositTime;
         uint256 borrowForAParticularToken = userDeposit[msg.sender][_token].amount;     
         uint256 amount = getUSDvalue(borrowForAParticularToken, _token); 
-        uint256 rewards = ((block.timestamp - duration) * amount)/REWARD_PER_SECOND ;
+        uint256 rewards = ((block.timestamp - duration) * amount)/REWARD_PER_SECOND ; ///use write
         return rewards;
     }
 
