@@ -125,18 +125,17 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@param _token the collateral address of the _account
     function liquidate(address _token ,address _account) external
         tokenallowed(_token) addressZero(_account){
+        require(userBorrow[_account][_token].amount > 0, "choose another token to liqudate");
         uint256 collateral = userDeposit[_account][_token].amount;
-        require(collateral > 0, "choose another token to liqudate");
         bool allow = liquidateAllowed(collateral,_token, _account);
         require(allow, "account can't be liquidated"); // this line is not really needed
         uint256 discount = (userBorrow[_account][_token].amount * LIQUIDATIONREWARDS)/ 100;
         uint256 pay = userBorrow[_account][_token].amount - discount;
         userBorrow[_account][_token].amount = 0;
+        userDeposit[_account][_token].amount = 0;
         USDtoken.safeTransferFrom(msg.sender, address(this), pay);
         emit liquidated(_token, _account, pay);
         transferFunds(_token, collateral);
-        userBorrow[_account][_token].liquidated = true;
-        userBorrow[_account][_token].borrowed = false;
     }
 
 
