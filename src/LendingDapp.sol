@@ -31,16 +31,23 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev the 4% discount for liquidation
     uint256 public LIQUIDATIONREWARDS = 4;
 
-    uint256 public constant MINIMUMDEPOSIT = 0.005 ether;
-
     ///@dev the rewardPerToken is hardcoded because the duration is not for a period of time
     uint256 public constant REWARD_PER_SECOND = 10000000; // 0.0000001
+
+    uint256 public BorowRate = 4; // 4%
 
     IERC20 public immutable USDtoken;
 
     IERC20 public immutable SummerToken;
 
     using SafeERC20 for IERC20;
+
+    struct ChainlinkResponse {
+        uint80 roundId;
+        int256 price;
+        uint256 updatedAt;
+        bool success;
+    }
 
     ///@dev blockNumber is to calculate user incentive from the time he deposit
     struct userDepositContainer{
@@ -54,8 +61,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         bool borrowed;
         bool liquidated;
     }
-    error BorrowNotallowed(uint256 _amount);
 
+    error ChainLinkFailed(string failed);
 
     constructor(address _USDtoken, address _summerToken){
         USDtoken = IERC20(_USDtoken);
@@ -73,6 +80,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     /////////////////////////////// MAIN FUNCTIONS /////////////////////////////////////
 
+    ///@param _token the collateral address
     function deposit(address _token , uint256 _amount) public  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
         userDeposit[msg.sender][_token].amount += _amount;
@@ -84,6 +92,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev the token to borrow is USD so no need to convert
     /// stores the collateral amount in USD for furture use
     /// The users inputs the amount of USD he wants to borrow and its compared to the collateral value in USD
+    ///@param _token the collateral address
     function borrow(uint256 _amount, address _token) external
         notZeroAmount(_amount) tokenallowed(_token){
         uint256 collateral = userDeposit[msg.sender][_token].amount;
@@ -100,17 +109,20 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         userBorrow[msg.sender][_token].liquidated = false;  
     }
 
-    ///@dev when you repay, the user repays in full
+    ///@dev when you repay, the user repays in full with interest
+    ///@param _token the collateral address
     function repay(uint256 _amount, address _token) external 
         notZeroAmount(_amount) tokenallowed(_token){
-        require(!userBorrow[msg.sender][_token].liquidated, "Revert: has been liquidated before"); // liquiated is not needed 
-        require(userBorrow[msg.sender][_token].amount == _amount, "Revert: User must repay in full");
+        require(userBorrow[msg.sender][_token].amount > 0, "Revert: has been liquidated before");
+        uint256 amountBorrowed = userBorrow[msg.sender][_token].amount;
+        uint256 interest = (amountBorrowed * BorowRate)/ 100;
+        require((amountBorrowed + interest) >= _amount, "Revert: User must repay in full");
         userBorrow[msg.sender][_token].amount = 0;
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        USDtoken.safeTransferFrom(msg.sender, address(this), _amount);
         emit repayed(_token,msg.sender,_amount);
-        userBorrow[msg.sender][_token].borrowed = false;
     }
 
+    ///@param _token the collateral address of the _account
     function liquidate(address _token ,address _account) external
         tokenallowed(_token) addressZero(_account){
         uint256 collateral = userDeposit[_account][_token].amount;
@@ -119,8 +131,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         require(allow, "account can't be liquidated"); // this line is not really needed
         uint256 discount = (userBorrow[_account][_token].amount * LIQUIDATIONREWARDS)/ 100;
         uint256 pay = userBorrow[_account][_token].amount - discount;
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), pay);
         userBorrow[_account][_token].amount = 0;
+        USDtoken.safeTransferFrom(msg.sender, address(this), pay);
         emit liquidated(_token, _account, pay);
         transferFunds(_token, collateral);
         userBorrow[_account][_token].liquidated = true;
@@ -129,6 +141,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
 
     ///@dev withdraw deposits with all the rewards accomulated 
+    ///@param _token the collateral address
     function withdraw(address _token, uint256 _amount) external  
         tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
         require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed repay first");
@@ -154,11 +167,35 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     //the protocol whitelistens any token to collect as collateral and only gives USDC tokens
     // the protocol gets its price for any token from chainlink price oracle
-    function getUSDvalue(uint256 _collateralValue, address _token) view public returns(uint256 ){
+    function getUSDvalue(uint256 _collateralValue, address _token) view  public returns(uint256 ){
+        ChainlinkResponse memory  cl;
         AggregatorV3Interface  dataFeed = AggregatorV3Interface(tokenToChainlinkPriceFeed[_token]);
-        (,int256 price,,,) = dataFeed.latestRoundData();
-        /// the figures from chainlink price oracle is divided by 1e8 to make all the tokens in 1e18 to easy conversions
-        return (uint256(price) * _collateralValue)/ 1e8;
+        try dataFeed.latestRoundData() returns (
+            uint80 roundId,
+            int256 price,
+            uint256 /* startedAt */,
+            uint256 updatedAt,
+            uint80 /* answeredInRound */
+        ) {
+            cl.success = true;
+            cl.roundId = roundId;
+            cl.price = price;
+            cl.updatedAt = updatedAt;
+
+            if (
+                cl.success == true &&
+                cl.roundId != 0 &&
+                cl.price >= 0 &&
+                cl.updatedAt != 0 && 
+                cl.updatedAt <= block.timestamp
+            ) {
+                /// the figures from chainlink price oracle is divided by 1e8 to make all the tokens in 1e18 to easy conversions
+                return (uint256(price) * _collateralValue)/ 1e8;
+            }
+
+        }catch  {
+            revert ChainLinkFailed("ChainkLink data not safe");
+        }
     }
 
     ///@return uint256 80% of the collateral 
@@ -171,7 +208,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         IERC20(_token).safeTransfer(msg.sender , _amount);
     }
 
-    function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view public returns(bool allow){
+    function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view  public returns(bool allow){
         uint256 currentCollateralPrice = getUSDvalue(_collateralValue,_token);
         uint256 previousCollateralPrice = userBorrow[borrower][_token].collateralUSDAtBorrowTime;
         uint256 threshold = (previousCollateralPrice * LIQUIDATIONFACTOR) / 100;
@@ -179,7 +216,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         return true;
     }
 
-    function borrowAllowed(uint256 _collateralValue, address _token, uint256 amountToBorrow) view public returns(bool allow){
+    function borrowAllowed(uint256 _collateralValue, address _token, uint256 amountToBorrow)view  public returns(bool allow){
         uint256 collateral = getUSDvalue(_collateralValue,_token);
         uint256 threshold = calculateCollateralThreshold(collateral);
         require(amountToBorrow <= threshold, "Revert: Reduce amount to borrow");
@@ -187,7 +224,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     }
 
     ///@dev the the rewards is calculated in terms of dollar
-    function getRewards(address _token) view private returns(uint256){
+    function getRewards(address _token)view  private returns(uint256){
         uint256 duration = userDeposit[msg.sender][_token].depositTime;
         uint256 borrowForAParticularToken = userDeposit[msg.sender][_token].amount;     
         uint256 amount = getUSDvalue(borrowForAParticularToken, _token); 
