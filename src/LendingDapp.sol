@@ -36,6 +36,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     uint256 public BorowRate = 4; // 4%
 
+    uint256 public AllInterestInUSD;
+
     IERC20 public immutable USDtoken;
 
     IERC20 public immutable SummerToken;
@@ -81,8 +83,9 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     /////////////////////////////// MAIN FUNCTIONS /////////////////////////////////////
 
     ///@param _token the collateral address
+    // when updating rewards for lending check if its USD the person deposite b$ u update
     function deposit(address _token , uint256 _amount) public  
-        tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
+        tokenallowed(_token) notZeroAmount(_amount) updateLendersRewards(_token, msg.sender){
         userDeposit[msg.sender][_token].amount += _amount;
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         emit deposited(_token, msg.sender, _amount);
@@ -104,9 +107,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         USDtoken.safeTransfer(msg.sender , _amount);
         emit borrowed(msg.sender,_amount);
         uint256 collateralValueInUSDAtTimeOfBorrow = getUSDvalue(collateral, _token);
+        // remember to check this logic to a nice one 
         userBorrow[msg.sender][_token].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
-        userBorrow[msg.sender][_token].borrowed = true; // no need to store borrowed . check borrowed amount
-        userBorrow[msg.sender][_token].liquidated = false;  
     }
 
     ///@dev when you repay, the user repays in full with interest
@@ -119,6 +121,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         require((amountBorrowed + interest) >= _amount, "Revert: User must repay in full");
         userBorrow[msg.sender][_token].amount = 0;
         USDtoken.safeTransferFrom(msg.sender, address(this), _amount);
+        AllInterestInUSD = AllInterestInUSD + interest;
         emit repayed(_token,msg.sender,_amount);
     }
 
@@ -142,16 +145,18 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev withdraw deposits with all the rewards accomulated 
     ///@param _token the collateral address
     function withdraw(address _token, uint256 _amount) external  
-        tokenallowed(_token) notZeroAmount(_amount) updateRewards(_token, msg.sender){
-        require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed repay first");
+        tokenallowed(_token) notZeroAmount(_amount) updateLendersRewards(_token, msg.sender){
+            // consider collateral factor
+        // require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed repay first");
+
         require(userDeposit[msg.sender][_token].amount >=_amount, "Revert: Amount to withdraw in high");
-        //check if the desposit in lesseer than what he wants to borrow
         userDeposit[msg.sender][_token].amount -= _amount;
         transferFunds(_token,_amount);
-        uint256 rewards =  UserRewards[msg.sender][_token];
-        UserRewards[msg.sender][_token] = 0;
-        require(SummerToken.balanceOf(address(this)) >= rewards, "insuffient rewards");
-        SummerToken.safeTransfer(msg.sender , _amount);
+
+        // uint256 rewards =  UserRewards[msg.sender][_token];
+        // UserRewards[msg.sender][_token] = 0;
+        // require(SummerToken.balanceOf(address(this)) >= rewards, "insuffient rewards");
+        // SummerToken.safeTransfer(msg.sender , _amount);
         emit withdrawed(_token, msg.sender, _amount);
     }
 
@@ -224,11 +229,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     ///@dev the the rewards is calculated in terms of dollar
     function getRewards(address _token)view  private returns(uint256){
-        uint256 duration = userDeposit[msg.sender][_token].depositTime;
-        uint256 borrowForAParticularToken = userDeposit[msg.sender][_token].amount;     
-        uint256 amount = getUSDvalue(borrowForAParticularToken, _token); 
-        uint256 rewards = ((block.timestamp - duration) * amount)/REWARD_PER_SECOND ; ///use write
-        return rewards;
+      
     }
 
     ///////////////////////////////////// MODIFIERS /////////////////////////////////
@@ -248,10 +249,15 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         _;
     }
 
-    modifier updateRewards(address _token, address owner){
-        uint256 rewards = getRewards(_token);
-        UserRewards[owner][_token] += rewards;
-        userDeposit[msg.sender][_token].depositTime = block.timestamp;
-        _;
+    modifier updateLendersRewards(address _token, address owner){
+        if(_token == address(USDtoken)){
+            uint256 rewards = getRewards(_token);
+            UserRewards[owner][_token] += rewards;
+            userDeposit[msg.sender][_token].depositTime = block.timestamp;
+            _;
+        }{
+            return;
+        }
+       
     }
 }
