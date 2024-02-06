@@ -17,12 +17,10 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@dev only owner can update this
     mapping(address => bool) whiteListedTokens;
 
-    ///@dev borrowerAddress => CollateralAddress => Container
-    mapping(address => mapping(address => userBorrowContainer)) public userBorrow;
+    ///@dev borrowerAddress => CollateralAddress => amount
+    mapping(address => mapping(address => uint256)) public userBorrow;
 
     mapping(address => mapping(address => userDepositContainer)) public userDeposit;
-
-    mapping(address => mapping(address => uint256)) UserRewards;
 
     uint256 public constant LIQUIDATIONFACTOR = 90;
 
@@ -30,9 +28,6 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     ///@dev the 4% discount for liquidation
     uint256 public LIQUIDATIONREWARDS = 4;
-
-    ///@dev the rewardPerToken is hardcoded because the duration is not for a period of time
-    uint256 public constant REWARD_PER_SECOND = 10000000; // 0.0000001
 
     uint256 public BorowRate = 4; // 4%
 
@@ -53,11 +48,6 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     struct userDepositContainer{
         uint256 amount;
         uint256 rewardDebt;
-    }
-
-    struct userBorrowContainer{
-        uint256 amount;
-        uint256 collateralUSDAtBorrowTime;
     }
 
     struct RewardContainer{
@@ -86,7 +76,6 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     /////////////////////////////// MAIN FUNCTIONS /////////////////////////////////////
 
     ///@param _token the collateral address
-    // when updating rewards for lending check if its USD the person deposite b$ u update
     function deposit(address _token , uint256 _amount) public  
         tokenallowed(_token) notZeroAmount(_amount){
         userDeposit[msg.sender][_token].amount += _amount;
@@ -98,35 +87,32 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     }
 
-    ///@dev the token to borrow is USD so no need to convert
     /// stores the collateral amount in USD for furture use
     /// The users inputs the amount of USD he wants to borrow and its compared to the collateral value in USD
     ///@param _token the collateral address
     function borrow(uint256 _amount, address _token) external
         notZeroAmount(_amount) tokenallowed(_token){
-        uint256 collateral = userDeposit[msg.sender][_token].amount;
-        require(collateral > 0, "Revert: insufficient funds");
-        // consider collateral factor 
-        // require(!userBorrow[msg.sender][_token].borrowed, "Revert: borrowed before pay back");
-        bool allow = borrowAllowed(collateral,_token,_amount);
-        require(allow, "Revert: borrowed not allowed"); // this line is not really needed
-        userBorrow[msg.sender][_token].amount = _amount;
-        USDtoken.safeTransfer(msg.sender , _amount);
-        emit borrowed(msg.sender,_amount);
-        uint256 collateralValueInUSDAtTimeOfBorrow = getUSDvalue(collateral, _token);
-        // remember to check this logic to a nice one 
-        userBorrow[msg.sender][_token].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
+            require(_token != address(USDtoken), "you cant borrow USD");
+            uint256 collateral = userDeposit[msg.sender][_token].amount;
+            require(collateral > 0, "Revert: insufficient funds");
+            // consider collateral factor 
+            // require(!userBorrow[msg.sender][_token].borrowed, "Revert: borrowed before pay back");
+            bool allow = borrowAllowed(collateral,_token,_amount);
+            require(allow, "Revert: borrowed not allowed"); // this line is not really needed
+            userBorrow[msg.sender][_token] = _amount;
+            USDtoken.safeTransfer(msg.sender , _amount);
+            emit borrowed(msg.sender,_amount);   
     }
 
     ///@dev when you repay, the user repays in full with interest
     ///@param _token the collateral address
     function repay(uint256 _amount, address _token) external 
         notZeroAmount(_amount) tokenallowed(_token){
-        require(userBorrow[msg.sender][_token].amount > 0, "Revert: has been liquidated before");
-        uint256 amountBorrowed = userBorrow[msg.sender][_token].amount;
+        require(userBorrow[msg.sender][_token] > 0, "Revert: has been liquidated before");
+        uint256 amountBorrowed = userBorrow[msg.sender][_token];
         uint256 interest = (amountBorrowed * BorowRate)/ 100;
         require((amountBorrowed + interest) >= _amount, "Revert: User must repay in full");
-        userBorrow[msg.sender][_token].amount = 0;
+        userBorrow[msg.sender][_token] = 0;
         USDtoken.safeTransferFrom(msg.sender, address(this), _amount);
         updateRewards(interest);
         emit repayed(_token,msg.sender,_amount);
@@ -135,13 +121,13 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@param _token the collateral address of the _account
     function liquidate(address _token ,address _account) external
         tokenallowed(_token) addressZero(_account){
-        require(userBorrow[_account][_token].amount > 0, "choose another token to liqudate");
+        require(userBorrow[_account][_token] > 0, "choose another token to liqudate");
         uint256 collateral = userDeposit[_account][_token].amount;
         bool allow = liquidateAllowed(collateral,_token, _account);
-        require(allow, "account can't be liquidated"); // this line is not really needed
-        uint256 discount = (userBorrow[_account][_token].amount * LIQUIDATIONREWARDS)/ 100;
-        uint256 pay = userBorrow[_account][_token].amount - discount;
-        userBorrow[_account][_token].amount = 0;
+        require(allow, "account can't be liquidated");
+        uint256 discount = (userBorrow[_account][_token] * LIQUIDATIONREWARDS)/ 100;
+        uint256 pay = userBorrow[_account][_token] - discount;
+        userBorrow[_account][_token] = 0;
         userDeposit[_account][_token].amount = 0;
         USDtoken.safeTransferFrom(msg.sender, address(this), pay);
         emit liquidated(_token, _account, pay);
@@ -223,10 +209,13 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view  public returns(bool allow){
         uint256 currentCollateralPrice = getUSDvalue(_collateralValue,_token);
-        uint256 previousCollateralPrice = userBorrow[borrower][_token].collateralUSDAtBorrowTime;
-        uint256 threshold = (previousCollateralPrice * LIQUIDATIONFACTOR) / 100;
-        require(currentCollateralPrice <= threshold, "Revert: 90% not reached");
-        return true;
+        uint256 threshold = (currentCollateralPrice * LIQUIDATIONFACTOR) / 100;
+        uint256 borrowmount = userBorrow[borrower][_token];
+        if(threshold <= borrowmount){
+            return true;
+        }else {
+            return false;
+        }
     }
 
     function borrowAllowed(uint256 _collateralValue, address _token, uint256 amountToBorrow)view  public returns(bool allow){
