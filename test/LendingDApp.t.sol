@@ -229,7 +229,7 @@ contract LendDAppTest is Test {
 
     function test_liquidate() public{
         vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, address(mockPriceFeed));
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
         vm.startPrank(depositor1);
         deal(WBNB,depositor1,1e18);
         IERC20(WBNB).approve(address(lendingDApp),1e18);
@@ -252,7 +252,7 @@ contract LendDAppTest is Test {
 
     function test_accountCantBeliquidate() public{
         vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, address(mockPriceFeed));
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
         vm.startPrank(depositor1);
         deal(WBNB,depositor1,1e18);
         IERC20(WBNB).approve(address(lendingDApp),1e18);
@@ -272,7 +272,7 @@ contract LendDAppTest is Test {
 
     function test_chooseAnotherAccountToLiquidate() public{
         vm.prank(owner);
-        lendingDApp.whitelistToken(WBNB, address(mockPriceFeed));
+        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
         vm.startPrank(depositor1);
         deal(WBNB,depositor1,1e18);
         IERC20(WBNB).approve(address(lendingDApp),1e18);
