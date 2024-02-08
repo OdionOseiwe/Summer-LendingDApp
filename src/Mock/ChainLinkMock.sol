@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 contract MockPriceFeed{
 
-    int256 price = 31781040000;
+    int256  price = 31781040000;
     function latestRoundData()
     public
     returns (
@@ -16,8 +16,8 @@ contract MockPriceFeed{
         return (0,price,0,0,0);
     }
 
-    function changePrice(int256 _price) public returns(int256){
-        price = _price;
+    function changePrice(int256 pricce)  public returns(int256){
+        return price = pricce;
     }
 }
 
