@@ -6,6 +6,7 @@ contract MockPriceFeed{
     int256  price = 31781040000;
     function latestRoundData()
     public
+    view
     returns (
       uint80 roundId,
       int256 answer,

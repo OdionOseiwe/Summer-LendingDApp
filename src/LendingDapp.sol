@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/safeERC20.sol";
 
 
-
 contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
 
@@ -66,8 +65,26 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     event WHITELISTED(address token_);
 
     error ChainLinkFailed(string failed);
+    error BadDebt(string NoInterests);
 
     using SafeERC20 for IERC20;
+
+    ///////////////////////////////////// MODIFIERS /////////////////////////////////
+
+    modifier tokenallowed(address token){
+        require(whiteListedTokens[token], "Revert: not whitelisted");
+        _;
+    }
+
+    modifier notZeroAmount(uint256 amount){
+        require(amount > 0, "Revert:zero amount");
+        _;
+    }
+
+    modifier addressZero(address targetAdress){
+        require(targetAdress != address(0), "Revert address zero not allowed");
+        _;
+    }
 
     constructor(address _uSDToken, address _summerToken){
         uSDToken = IERC20(_uSDToken);
@@ -87,6 +104,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
     }
 
+
     /// stores the collateral amount in USD for furture use
     /// The users inputs the amount of USD he wants to borrow and its compared to the collateral value in USD
     ///@param token the collateral address
@@ -103,6 +121,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
             uSDToken.safeTransfer(msg.sender , amount);
     }
 
+
     ///@dev when you repay, the user repays in full with interest
     ///@param token the collateral address
     function repay(uint256 amount, address token) external 
@@ -110,12 +129,13 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         require(userBorrow[msg.sender][token] > 0, "Revert: has been LIQUIDATED before");
         uint256 amountBorrowed = userBorrow[msg.sender][token];
         uint256 interest = (amountBorrowed * BORROW_RATE)/ 100;
-        require((amountBorrowed + interest) >= amount, "Revert: User must repay in full");
+        require( amount >= (amountBorrowed + interest), "Revert: User must repay in full");
         userBorrow[msg.sender][token] = 0;
         emit REPAYED(token,msg.sender,amount);
         updateRewards(interest);
         uSDToken.safeTransferFrom(msg.sender, address(this), amount);
     }
+
 
     ///@param token the collateral address of the account
     function liquidate(address token ,address account) external
@@ -140,18 +160,23 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     function withdraw(address token, uint256 amount) external  
         tokenallowed(token) notZeroAmount(amount){
         require(userBorrow[msg.sender][token] == 0, "Revert: You borrowed repay first");
-
-        require(userDeposit[msg.sender][token].amount >=amount, "Revert: Amount to withdraw in high");
+        uint256 UserDeposit = userDeposit[msg.sender][token].amount;
+        require(UserDeposit >= amount, "Revert: Amount to withdraw in high");
         userDeposit[msg.sender][token].amount -= amount;   
         emit WITHDRAWED(token, msg.sender, amount);     
         if(token == address(uSDToken)){
             uint256 pending =
-            (userDeposit[msg.sender][token].amount * (rewards.rewardPerToken)) - userDeposit[msg.sender][token].rewardDebt;
-            userDeposit[msg.sender][token].rewardDebt = userDeposit[msg.sender][token].amount * rewards.rewardPerToken;
-            transferFunds(address(uSDToken), pending);
+            (UserDeposit * (rewards.rewardPerToken)) - userDeposit[msg.sender][token].rewardDebt;
+            if(pending > 0){
+                userDeposit[msg.sender][token].rewardDebt = userDeposit[msg.sender][token].amount * rewards.rewardPerToken;
+                transferFunds(address(uSDToken), pending);
+            }else{
+                revert BadDebt("no interest accommulated");
+            }
         }
         transferFunds(token,amount);
     }
+
 
     function whitelistToken(address token, address priceFeed) external onlyOwner addressZero(priceFeed) addressZero(token){
         require(!whiteListedTokens[token], "Revert: Token already exists");
@@ -195,15 +220,18 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         }
     }
 
+
     ///@return uint256 80% of the collateral 
     function calculateCollateralThreshold(uint256 collateral) pure private returns(uint256){
         return (collateral * COLLATERAL_FACTOR) / 100;
     }
 
+
     function transferFunds(address token,uint256 amount) private{
         require(IERC20(token).balanceOf(address(this)) >= amount, "insuffient funds");
         IERC20(token).safeTransfer(msg.sender , amount);
     }
+
 
     function liquidateAllowed(uint256 collateralValue ,address token, address borrower) view  public returns(bool allow){
         uint256 currentCollateralPrice = getUSDvalue(collateralValue,token);
@@ -216,6 +244,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         }
     }
 
+
     function borrowAllowed(uint256 collateralValue, address token, uint256 amountToBorrow, uint256 oldBorrow)view  public returns(bool allow){
         uint256 collateral = getUSDvalue(collateralValue,token);
         uint256 threshold = calculateCollateralThreshold(collateral);
@@ -223,36 +252,25 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
             require((amountToBorrow + oldBorrow) <= threshold, "Revert: You need to top your collateral you borrow B4");
             return true;
         }else{
-            require(amountToBorrow <= threshold, "Revert: top collateral or Reduce amoun to borrow");
+            require(amountToBorrow <= threshold, "Revert: top collateral or Reduce amount to borrow");
             return true;
         }
     }
 
     ///@dev the the rewards is calculated in terms of dollar
-    function updateRewards(uint256 newRewards)  private{
-            uint256 lpSupply = uSDToken.balanceOf(address(this));
-            if (lpSupply <= 0) {
-                return ;
-            }
-            rewards.allInterestInUSD = rewards.allInterestInUSD + newRewards;
-            rewards.rewardPerToken = (rewards.allInterestInUSD / lpSupply);
+    function updateRewards(uint256 newRewards)  public{
+        rewards.allInterestInUSD = (rewards.allInterestInUSD + newRewards);
+        uint256 lpSupply = IERC20(uSDToken).balanceOf(address(this));
+        if(lpSupply > 0){
+            rewards.rewardPerToken = (rewards.allInterestInUSD / lpSupply) * 1e18;
+        }
+    } 
+    
+}
 
-    }
-
-    ///////////////////////////////////// MODIFIERS /////////////////////////////////
-
-    modifier tokenallowed(address token){
-        require(whiteListedTokens[token], "Revert: not whitelisted");
-        _;
-    }
-
-    modifier notZeroAmount(uint256 amount){
-        require(amount > 0, "Revert:zero amount");
-        _;
-    }
-
-    modifier addressZero(address targetAdress){
-        require(targetAdress != address(0), "Revert address zero not allowed");
-        _;
+contract TestContract is LendingDApp(0x6B3595068778DD592e39A122f4f5a5cF09C90fE2, 0x6B3595068778DD592e39A122f4f5a5cF09C90fE2) {
+    function echidna_test_All() public pure returns(bool){
+        return true;
     }
 }
+
