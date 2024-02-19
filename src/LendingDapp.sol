@@ -8,39 +8,32 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/safeERC20.sol";
 
 
-
 contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
+
+
+    uint256 public constant LIQUIDATION_FACTOR = 90;
+
+    uint256 public constant COLLATERAL_FACTOR = 80;
+
+    ///@dev the 4% discount for liquidation
+    uint256 public constant LIQUIDATION_REWARDS = 4;
+
+    uint256 public constant BORROW_RATE = 4; // 4%
+
+    IERC20 public immutable uSDToken;
+
+    IERC20 public immutable summerToken;
 
     ///@dev to store the priceFeed for the whiteListed tokens
     mapping(address => address) public tokenToChainlinkPriceFeed;
 
     ///@dev only owner can update this
     mapping(address => bool) whiteListedTokens;
-
-    ///@dev borrowerAddress => CollateralAddress => Container
-    mapping(address => mapping(address => userBorrowContainer)) public userBorrow;
-
-    mapping(address => mapping(address => userDepositContainer)) public userDeposit;
-
-    mapping(address => mapping(address => uint256)) UserRewards;
-
-    uint256 public constant LIQUIDATIONFACTOR = 90;
-
-    uint256 public constant COLLATERALFACTOR = 80;
-
-    ///@dev the 4% discount for liquidation
-    uint256 public LIQUIDATIONREWARDS = 4;
-
-    ///@dev the rewardPerToken is hardcoded because the duration is not for a period of time
-    uint256 public constant REWARD_PER_SECOND = 10000000; // 0.0000001
-
-    uint256 public BorowRate = 4; // 4%
-
-    IERC20 public immutable USDtoken;
-
-    IERC20 public immutable SummerToken;
-
-    using SafeERC20 for IERC20;
+    
+    ///@dev borrowerAddress => CollateralAddress => amount
+    mapping(address => mapping(address => uint256)) public userBorrow;
+    
+    mapping(address => mapping(address => UserDepositContainer)) public userDeposit;
 
     struct ChainlinkResponse {
         uint80 roundId;
@@ -50,14 +43,9 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     }
 
     ///@dev blockNumber is to calculate user incentive from the time he deposit
-    struct userDepositContainer{
+    struct UserDepositContainer{
         uint256 amount;
         uint256 rewardDebt;
-    }
-
-    struct userBorrowContainer{
-        uint256 amount;
-        uint256 collateralUSDAtBorrowTime;
     }
 
     struct RewardContainer{
@@ -67,123 +55,147 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
 
     RewardContainer public rewards;
 
-    error ChainLinkFailed(string failed);
-
-    constructor(address _USDtoken, address _summerToken){
-        USDtoken = IERC20(_USDtoken);
-        SummerToken = IERC20(_summerToken);
-    }
-
     //////////////////////////////////////// EVENTS /////////////////////////////////////
 
-    event deposited(address  indexed token_, address indexed user_, uint256 amount_);
-    event borrowed(address indexed user_, uint256 amount_);
-    event liquidated(address indexed token_, address indexed user_, uint256 amount_);
-    event repayed(address indexed token_, address indexed user_, uint256 amount_);
-    event withdrawed(address indexed token_, address indexed user_, uint256 amount_);
-    event whiteListed(address token_);
+    event DEPOSITED(address  indexed token_, address indexed user_, uint256 amount_);
+    event BORROWED(address indexed user_, uint256 amount_);
+    event LIQUIDATED(address indexed token_, address indexed user_, uint256 amount_);
+    event REPAYED(address indexed token_, address indexed user_, uint256 amount_);
+    event WITHDRAWED(address indexed token_, address indexed user_, uint256 amount_);
+    event WHITELISTED(address token_);
+
+    error ChainLinkFailed(string failed);
+    error BadDebt(string NoInterests);
+
+    using SafeERC20 for IERC20;
+
+    ///////////////////////////////////// MODIFIERS /////////////////////////////////
+
+    modifier tokenallowed(address token){
+        require(whiteListedTokens[token], "Revert: not whitelisted");
+        _;
+    }
+
+    modifier notZeroAmount(uint256 amount){
+        require(amount > 0, "Revert:zero amount");
+        _;
+    }
+
+    modifier addressZero(address targetAdress){
+        require(targetAdress != address(0), "Revert address zero not allowed");
+        _;
+    }
+
+    constructor(address _uSDToken, address _summerToken){
+        uSDToken = IERC20(_uSDToken);
+        summerToken = IERC20(_summerToken);
+    }
 
     /////////////////////////////// MAIN FUNCTIONS /////////////////////////////////////
 
-    ///@param _token the collateral address
-    // when updating rewards for lending check if its USD the person deposite b$ u update
-    function deposit(address _token , uint256 _amount) public  
-        tokenallowed(_token) notZeroAmount(_amount){
-        userDeposit[msg.sender][_token].amount += _amount;
-        if(_token == address(USDtoken)){
-            userDeposit[msg.sender][_token].rewardDebt = userDeposit[msg.sender][_token].amount * rewards.rewardPerToken;
+    ///@param token the collateral address
+    function deposit(address token , uint256 amount) public  
+        tokenallowed(token) notZeroAmount(amount){
+        updateRewards();
+        userDeposit[msg.sender][token].amount += amount;
+        if(token == address(uSDToken)){
+            userDeposit[msg.sender][token].rewardDebt = ((userDeposit[msg.sender][token].amount * rewards.rewardPerToken)/1e18);
         }
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
-        emit deposited(_token, msg.sender, _amount);
-
+        emit DEPOSITED(token, msg.sender, amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    ///@dev the token to borrow is USD so no need to convert
+
     /// stores the collateral amount in USD for furture use
     /// The users inputs the amount of USD he wants to borrow and its compared to the collateral value in USD
-    ///@param _token the collateral address
-    function borrow(uint256 _amount, address _token) external
-        notZeroAmount(_amount) tokenallowed(_token){
-        uint256 collateral = userDeposit[msg.sender][_token].amount;
-        require(collateral > 0, "Revert: insufficient funds");
-        // consider collateral factor 
-        // require(!userBorrow[msg.sender][_token].borrowed, "Revert: borrowed before pay back");
-        bool allow = borrowAllowed(collateral,_token,_amount);
-        require(allow, "Revert: borrowed not allowed"); // this line is not really needed
-        userBorrow[msg.sender][_token].amount = _amount;
-        USDtoken.safeTransfer(msg.sender , _amount);
-        emit borrowed(msg.sender,_amount);
-        uint256 collateralValueInUSDAtTimeOfBorrow = getUSDvalue(collateral, _token);
-        // remember to check this logic to a nice one 
-        userBorrow[msg.sender][_token].collateralUSDAtBorrowTime = collateralValueInUSDAtTimeOfBorrow;
+    ///@param token the collateral address
+    function borrow(uint256 amount, address token) external
+        notZeroAmount(amount) tokenallowed(token){
+            require(token != address(uSDToken), "you cant borrow USD");
+            uint256 collateral = userDeposit[msg.sender][token].amount;
+            require(collateral > 0, "Revert: insufficient funds");
+            uint256 oldBorrow = userBorrow[msg.sender][token];
+            bool allow = borrowAllowed(collateral,token,amount,oldBorrow);
+            require(allow, "Revert: BORROWED not allowed");
+            userBorrow[msg.sender][token] += amount;
+            emit BORROWED(msg.sender,amount);   
+            uSDToken.safeTransfer(msg.sender , amount);
     }
+
 
     ///@dev when you repay, the user repays in full with interest
-    ///@param _token the collateral address
-    function repay(uint256 _amount, address _token) external 
-        notZeroAmount(_amount) tokenallowed(_token){
-        require(userBorrow[msg.sender][_token].amount > 0, "Revert: has been liquidated before");
-        uint256 amountBorrowed = userBorrow[msg.sender][_token].amount;
-        uint256 interest = (amountBorrowed * BorowRate)/ 100;
-        require((amountBorrowed + interest) >= _amount, "Revert: User must repay in full");
-        userBorrow[msg.sender][_token].amount = 0;
-        USDtoken.safeTransferFrom(msg.sender, address(this), _amount);
-        updateRewards(interest);
-        emit repayed(_token,msg.sender,_amount);
+    ///@param token the collateral address
+    function repay(uint256 amount, address token) external 
+        notZeroAmount(amount) tokenallowed(token){
+        require(userBorrow[msg.sender][token] > 0, "Revert: has been LIQUIDATED before");
+        uint256 amountBorrowed = userBorrow[msg.sender][token];
+        uint256 interest = (amountBorrowed * BORROW_RATE)/ 100;
+        require( amount >= (amountBorrowed + interest), "Revert: User must repay in full");
+        userBorrow[msg.sender][token] = 0;
+        rewards.allInterestInUSD = (rewards.allInterestInUSD + interest);
+        emit REPAYED(token,msg.sender,amount);
+        uSDToken.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    ///@param _token the collateral address of the _account
-    function liquidate(address _token ,address _account) external
-        tokenallowed(_token) addressZero(_account){
-        require(userBorrow[_account][_token].amount > 0, "choose another token to liqudate");
-        uint256 collateral = userDeposit[_account][_token].amount;
-        bool allow = liquidateAllowed(collateral,_token, _account);
-        require(allow, "account can't be liquidated"); // this line is not really needed
-        uint256 discount = (userBorrow[_account][_token].amount * LIQUIDATIONREWARDS)/ 100;
-        uint256 pay = userBorrow[_account][_token].amount - discount;
-        userBorrow[_account][_token].amount = 0;
-        userDeposit[_account][_token].amount = 0;
-        USDtoken.safeTransferFrom(msg.sender, address(this), pay);
-        emit liquidated(_token, _account, pay);
-        transferFunds(_token, collateral);
+
+    ///@param token the collateral address of the account
+    function liquidate(address token ,address account) external
+        tokenallowed(token) addressZero(account){
+        require(userBorrow[account][token] > 0, "choose another token to liqudate");
+        uint256 collateral = userDeposit[account][token].amount;
+        bool allow = liquidateAllowed(collateral,token, account);
+        require(allow, "account can't be LIQUIDATED");
+        uint256 discount = (userBorrow[account][token] * LIQUIDATION_REWARDS)/ 100;
+        uint256 pay = userBorrow[account][token] - discount;
+        require(pay < collateral, "improper payment");
+        userBorrow[account][token] = 0;
+        userDeposit[account][token].amount = 0;
+        emit LIQUIDATED(token, account, pay);
+        uSDToken.safeTransferFrom(msg.sender, address(this), pay);
+        transferFunds(token, collateral);
     }
 
 
     ///@dev withdraw deposits with all the rewards accomulated 
-    ///@param _token the collateral address
-    function withdraw(address _token, uint256 _amount) external  
-        tokenallowed(_token) notZeroAmount(_amount){
-
-        // consider collateral factor
-        // require(!userBorrow[msg.sender][_token].borrowed, "Revert: You borrowed repay first");
-
-        require(userDeposit[msg.sender][_token].amount >=_amount, "Revert: Amount to withdraw in high");
-        if(_token == address(USDtoken)){
+    ///@param token the collateral address
+    function withdraw(address token, uint256 amount) external  
+        tokenallowed(token) notZeroAmount(amount){
+        updateRewards();
+        require(userBorrow[msg.sender][token] == 0, "Revert: You borrowed repay first");
+        uint256 UserDeposit = userDeposit[msg.sender][token].amount;
+        require(UserDeposit >= amount, "Revert: Amount to withdraw in high");
+        userDeposit[msg.sender][token].amount -= amount;   
+        emit WITHDRAWED(token, msg.sender, amount);     
+        if(token == address(uSDToken)){
             uint256 pending =
-            (userDeposit[msg.sender][_token].amount * (rewards.rewardPerToken)) - userDeposit[msg.sender][_token].rewardDebt;
-            transferFunds(address(USDtoken), pending);
-            userDeposit[msg.sender][_token].rewardDebt = userDeposit[msg.sender][_token].amount * rewards.rewardPerToken;
+            (UserDeposit * rewards.rewardPerToken) /1e18 - userDeposit[msg.sender][token].rewardDebt;
+            if(pending > 0){
+                userDeposit[msg.sender][token].rewardDebt = (userDeposit[msg.sender][token].amount * rewards.rewardPerToken) / 1e18;
+                rewards.allInterestInUSD = rewards.allInterestInUSD - pending;
+                transferFunds(address(uSDToken), pending);
+            }else{
+                revert BadDebt("no interest accommulated");
+            }
         }
-        userDeposit[msg.sender][_token].amount -= _amount;
-        transferFunds(_token,_amount);
-        emit withdrawed(_token, msg.sender, _amount);
+        transferFunds(token,amount);
     }
 
-    function whitelistToken(address _token, address _priceFeed) external onlyOwner addressZero(_priceFeed) addressZero(_token){
-        require(!whiteListedTokens[_token], "Revert: Token already exists");
-        whiteListedTokens[_token] = true;
-        tokenToChainlinkPriceFeed[_token] = _priceFeed;
-        emit whiteListed(_token);
+
+    function whitelistToken(address token, address priceFeed) external onlyOwner addressZero(priceFeed) addressZero(token){
+        require(!whiteListedTokens[token], "Revert: Token already exists");
+        whiteListedTokens[token] = true;
+        tokenToChainlinkPriceFeed[token] = priceFeed;
+        emit WHITELISTED(token);
     }
 
     ////////////////////////////////////// HELPERS //////////////////////////////////
 
     //the protocol whitelistens any token to collect as collateral and only gives USDC tokens
     // the protocol gets its price for any token from chainlink price oracle
-    function getUSDvalue(uint256 _collateralValue, address _token) view  public returns(uint256 ){
+    function getUSDvalue(uint256 collateralValue, address token) view  public returns(uint256){
         ChainlinkResponse memory  cl;
-        AggregatorV3Interface  dataFeed = AggregatorV3Interface(tokenToChainlinkPriceFeed[_token]);
-        try dataFeed.latestRoundData() returns (
+        AggregatorV3Interface  dataFeed = AggregatorV3Interface(tokenToChainlinkPriceFeed[token]);
+        try  dataFeed.latestRoundData() returns (
             uint80 roundId,
             int256 price,
             uint256 /* startedAt */,
@@ -199,11 +211,11 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
                 cl.success == true &&
                 cl.roundId != 0 &&
                 cl.price >= 0 &&
-                cl.updatedAt != 0 && 
+                cl.updatedAt != 0 &&
                 cl.updatedAt <= block.timestamp
             ) {
                 /// the figures from chainlink price oracle is divided by 1e8 to make all the tokens in 1e18 to easy conversions
-                return (uint256(price) * _collateralValue)/ 1e8;
+                return (uint256(price) * collateralValue)/ 1e8;
             }
 
         }catch  {
@@ -211,56 +223,57 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         }
     }
 
+
     ///@return uint256 80% of the collateral 
     function calculateCollateralThreshold(uint256 collateral) pure private returns(uint256){
-        return (collateral * COLLATERALFACTOR) / 100;
+        return (collateral * COLLATERAL_FACTOR) / 100;
     }
 
-    function transferFunds(address _token,uint256 _amount) private{
-        require(IERC20(_token).balanceOf(address(this)) >= _amount, "insuffient funds");
-        IERC20(_token).safeTransfer(msg.sender , _amount);
+
+    function transferFunds(address token,uint256 amount) private{
+        require(IERC20(token).balanceOf(address(this)) >= amount, "insuffient funds");
+        IERC20(token).safeTransfer(msg.sender , amount);
     }
 
-    function liquidateAllowed(uint256 _collateralValue ,address _token, address borrower) view  public returns(bool allow){
-        uint256 currentCollateralPrice = getUSDvalue(_collateralValue,_token);
-        uint256 previousCollateralPrice = userBorrow[borrower][_token].collateralUSDAtBorrowTime;
-        uint256 threshold = (previousCollateralPrice * LIQUIDATIONFACTOR) / 100;
-        require(currentCollateralPrice <= threshold, "Revert: 90% not reached");
-        return true;
+
+    function liquidateAllowed(uint256 collateralValue ,address token, address borrower) view  public returns(bool allow){
+        uint256 currentCollateralPrice = getUSDvalue(collateralValue,token);
+        uint256 threshold = (currentCollateralPrice * LIQUIDATION_FACTOR) / 100;
+        uint256 borrowmount = userBorrow[borrower][token];
+        if(threshold <= borrowmount){
+            return true;
+        }else {
+            return false;
+        }
     }
 
-    function borrowAllowed(uint256 _collateralValue, address _token, uint256 amountToBorrow)view  public returns(bool allow){
-        uint256 collateral = getUSDvalue(_collateralValue,_token);
+
+    function borrowAllowed(uint256 collateralValue, address token, uint256 amountToBorrow, uint256 oldBorrow)view  public returns(bool allow){
+        uint256 collateral = getUSDvalue(collateralValue,token);
         uint256 threshold = calculateCollateralThreshold(collateral);
-        require(amountToBorrow <= threshold, "Revert: Reduce amount to borrow");
-        return true;
+        if(oldBorrow > 0){
+            require((amountToBorrow + oldBorrow) <= threshold, "Revert: You need to top your collateral you borrow B4");
+            return true;
+        }else{
+            require(amountToBorrow <= threshold, "Revert: top collateral or Reduce amount to borrow");
+            return true;
+        }
     }
 
     ///@dev the the rewards is calculated in terms of dollar
-    function updateRewards(uint256 newRewards)  private{
-            uint256 lpSupply = USDtoken.balanceOf(address(this));
-            if (lpSupply == 0) {
-                return ;
-            }
-            rewards.allInterestInUSD = rewards.allInterestInUSD + newRewards;
-            rewards.rewardPerToken = (rewards.allInterestInUSD / lpSupply);
+    function updateRewards()  public{
+        uint256 lpSupply = IERC20(uSDToken).balanceOf(address(this));
+        uint256 divisor = lpSupply - rewards.allInterestInUSD;
+        if(lpSupply > 0){
+            rewards.rewardPerToken = (rewards.allInterestInUSD * 1e18/ divisor);
+        }
+    } 
+    
+}
 
-    }
-
-    ///////////////////////////////////// MODIFIERS /////////////////////////////////
-
-    modifier tokenallowed(address _token){
-        require(whiteListedTokens[_token], "Revert: not whitelisted");
-        _;
-    }
-
-    modifier notZeroAmount(uint256 _amount){
-        require(_amount > 0, "Revert:zero amount");
-        _;
-    }
-
-    modifier addressZero(address _address){
-        require(_address != address(0), "Revert address zero not allowed");
-        _;
+contract TestContract is LendingDApp(0x6B3595068778DD592e39A122f4f5a5cF09C90fE2, 0x6B3595068778DD592e39A122f4f5a5cF09C90fE2) {
+    function echidna_test_All() public pure returns(bool){
+        return true;
     }
 }
+
