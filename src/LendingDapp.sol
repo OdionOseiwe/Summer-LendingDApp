@@ -96,9 +96,10 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@param token the collateral address
     function deposit(address token , uint256 amount) public  
         tokenallowed(token) notZeroAmount(amount){
+        updateRewards();
         userDeposit[msg.sender][token].amount += amount;
         if(token == address(uSDToken)){
-            userDeposit[msg.sender][token].rewardDebt = userDeposit[msg.sender][token].amount * rewards.rewardPerToken;
+            userDeposit[msg.sender][token].rewardDebt = ((userDeposit[msg.sender][token].amount * rewards.rewardPerToken)/1e18);
         }
         emit DEPOSITED(token, msg.sender, amount);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -131,8 +132,8 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         uint256 interest = (amountBorrowed * BORROW_RATE)/ 100;
         require( amount >= (amountBorrowed + interest), "Revert: User must repay in full");
         userBorrow[msg.sender][token] = 0;
+        rewards.allInterestInUSD = (rewards.allInterestInUSD + interest);
         emit REPAYED(token,msg.sender,amount);
-        updateRewards(interest);
         uSDToken.safeTransferFrom(msg.sender, address(this), amount);
     }
 
@@ -159,6 +160,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     ///@param token the collateral address
     function withdraw(address token, uint256 amount) external  
         tokenallowed(token) notZeroAmount(amount){
+        updateRewards();
         require(userBorrow[msg.sender][token] == 0, "Revert: You borrowed repay first");
         uint256 UserDeposit = userDeposit[msg.sender][token].amount;
         require(UserDeposit >= amount, "Revert: Amount to withdraw in high");
@@ -166,9 +168,10 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         emit WITHDRAWED(token, msg.sender, amount);     
         if(token == address(uSDToken)){
             uint256 pending =
-            (UserDeposit * (rewards.rewardPerToken)) - userDeposit[msg.sender][token].rewardDebt;
+            (UserDeposit * rewards.rewardPerToken) /1e18 - userDeposit[msg.sender][token].rewardDebt;
             if(pending > 0){
-                userDeposit[msg.sender][token].rewardDebt = userDeposit[msg.sender][token].amount * rewards.rewardPerToken;
+                userDeposit[msg.sender][token].rewardDebt = (userDeposit[msg.sender][token].amount * rewards.rewardPerToken) / 1e18;
+                rewards.allInterestInUSD = rewards.allInterestInUSD - pending;
                 transferFunds(address(uSDToken), pending);
             }else{
                 revert BadDebt("no interest accommulated");
@@ -258,11 +261,11 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     }
 
     ///@dev the the rewards is calculated in terms of dollar
-    function updateRewards(uint256 newRewards)  public{
-        rewards.allInterestInUSD = (rewards.allInterestInUSD + newRewards);
+    function updateRewards()  public{
         uint256 lpSupply = IERC20(uSDToken).balanceOf(address(this));
+        uint256 divisor = lpSupply - rewards.allInterestInUSD;
         if(lpSupply > 0){
-            rewards.rewardPerToken = (rewards.allInterestInUSD / lpSupply) * 1e18;
+            rewards.rewardPerToken = (rewards.allInterestInUSD * 1e18/ divisor);
         }
     } 
     

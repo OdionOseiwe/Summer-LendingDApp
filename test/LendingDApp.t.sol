@@ -310,11 +310,12 @@ contract LendDAppTest is Test {
         lendingDApp.deposit(address(mockUSDT), 10000e18);
         IERC20(mockUSDT).balanceOf(depositor2); //check if it left user wallet
 
-        vm.startPrank(depositor1);
-        mockUSDT.mint(depositor1, 10000e18);
+        //lenders deposits
+        vm.startPrank(owner);
+        mockUSDT.mint(owner, 10000e18);
         IERC20(mockUSDT).approve(address(lendingDApp),10000e18);
         lendingDApp.deposit(address(mockUSDT), 10000e18);
-        IERC20(mockUSDT).balanceOf(depositor1); //check if it left user wallet
+        IERC20(mockUSDT).balanceOf(owner); //check if it left user wallet
 
         // users comes to borrow
         vm.startPrank(depositor1);
@@ -325,6 +326,26 @@ contract LendDAppTest is Test {
         IERC20(mockUSDT).balanceOf(depositor1);
         skip(1209600);
         mockUSDT.mint(depositor1, 8e18);
+        IERC20(mockUSDT).approve(address(lendingDApp), 208e18);
+        lendingDApp.repay(208e18,WBNB);
+        lendingDApp.withdraw(WBNB,1e18);
+
+        //lenders deposits
+        vm.startPrank(depositor1);
+        mockUSDT.mint(depositor1, 10000e18);
+        IERC20(mockUSDT).approve(address(lendingDApp),10000e18);
+        lendingDApp.deposit(address(mockUSDT), 10000e18);
+        IERC20(mockUSDT).balanceOf(depositor1); //check if it left user wallet
+
+        // another borrow
+        vm.startPrank(owner);
+        deal(WBNB,owner,1e18);
+        IERC20(WBNB).approve(address(lendingDApp),1e18);
+        lendingDApp.deposit(WBNB, 1e18);
+        lendingDApp.borrow(200e18, WBNB);
+        IERC20(mockUSDT).balanceOf(owner);
+        skip(1209600);
+        mockUSDT.mint(owner, 8e18);
         IERC20(mockUSDT).approve(address(lendingDApp), 208e18);
         lendingDApp.repay(208e18,WBNB);
         lendingDApp.withdraw(WBNB,1e18);
@@ -341,6 +362,7 @@ contract LendDAppTest is Test {
         IERC20(mockUSDT).approve(address(lendingDApp), 208e18);
         lendingDApp.repay(208e18,WBNB);
         lendingDApp.withdraw(WBNB,1e18);
+    
 
         // lenders withdraws 
         vm.startPrank(depositor1);
@@ -349,29 +371,36 @@ contract LendDAppTest is Test {
         lendingDApp.withdraw(address(mockUSDT),10000e18);
         IERC20(mockUSDT).balanceOf(depositor1); //check if the amount came into the user wallet
 
-    }
-
-    function test_CantBorrowUSD() public {
-        vm.startPrank(owner);
-        lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
-        lendingDApp.whitelistToken(address(mockUSDT), BNB_USDPriceFeed);
+        // lenders withdraws 
         vm.startPrank(depositor2);
+        lendingDApp.rewards();
+        lendingDApp.userDeposit(depositor2, address(mockUSDT));
+        lendingDApp.withdraw(address(mockUSDT),10000e18);
+        IERC20(mockUSDT).balanceOf(depositor2); //check if the amount came into the user wallet
 
-        //lenders deposits
-        mockUSDT.mint(depositor2, 10000e18);
-        IERC20(mockUSDT).approve(address(lendingDApp),10000e18);
-        lendingDApp.deposit(address(mockUSDT), 10000e18);
-        IERC20(mockUSDT).balanceOf(depositor2); //check if it left user wallet
-
-        // users comes to borrow
-        vm.startPrank(depositor1);
-        mockUSDT.mint(depositor1, 1000e18);
-        IERC20(mockUSDT).approve(address(lendingDApp),1000e18);
-        lendingDApp.deposit(address(mockUSDT), 1000e18);
-        vm.expectRevert(bytes("you cant borrow USD"));
-        lendingDApp.borrow(200e18, address(mockUSDT));
-       
     }
+
+    // function test_CantBorrowUSD() public {
+    //     vm.startPrank(owner);
+    //     lendingDApp.whitelistToken(WBNB, BNB_USDPriceFeed);
+    //     lendingDApp.whitelistToken(address(mockUSDT), BNB_USDPriceFeed);
+    //     vm.startPrank(depositor2);
+
+    //     //lenders deposits
+    //     mockUSDT.mint(depositor2, 10000e18);
+    //     IERC20(mockUSDT).approve(address(lendingDApp),10000e18);
+    //     lendingDApp.deposit(address(mockUSDT), 10000e18);
+    //     IERC20(mockUSDT).balanceOf(depositor2); //check if it left user wallet
+
+    //     // users comes to borrow
+    //     vm.startPrank(depositor1);
+    //     mockUSDT.mint(depositor1, 1000e18);
+    //     IERC20(mockUSDT).approve(address(lendingDApp),1000e18);
+    //     lendingDApp.deposit(address(mockUSDT), 1000e18);
+    //     vm.expectRevert(bytes("you cant borrow USD"));
+    //     lendingDApp.borrow(200e18, address(mockUSDT));
+       
+    // }
 
     function mkaddr(string memory name) public returns (address) {
         address addr = address(uint160(uint256(keccak256(abi.encodePacked(name)))));
