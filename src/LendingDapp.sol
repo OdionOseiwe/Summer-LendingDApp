@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import "./interface/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -193,30 +193,17 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
     //the protocol whitelistens any token to collect as collateral and only gives USDC tokens
     // the protocol gets its price for any token from chainlink price oracle
     function getUSDvalue(uint256 collateralValue, address token) view  public returns(uint256){
-        ChainlinkResponse memory  cl;
         AggregatorV3Interface  dataFeed = AggregatorV3Interface(tokenToChainlinkPriceFeed[token]);
         try  dataFeed.latestRoundData() returns (
-            uint80 roundId,
+            uint80,
             int256 price,
             uint256 /* startedAt */,
-            uint256 updatedAt,
+            uint256,
             uint80 /* answeredInRound */
         ) {
-            cl.success = true;
-            cl.roundId = roundId;
-            cl.price = price;
-            cl.updatedAt = updatedAt;
-
-            if (
-                cl.success == true &&
-                cl.roundId != 0 &&
-                cl.price >= 0 &&
-                cl.updatedAt != 0 &&
-                cl.updatedAt <= block.timestamp
-            ) {
                 /// the figures from chainlink price oracle is divided by 1e8 to make all the tokens in 1e18 to easy conversions
                 return (uint256(price) * collateralValue)/ 1e8;
-            }
+
 
         }catch  {
             revert ChainLinkFailed("ChainkLink data not safe");
