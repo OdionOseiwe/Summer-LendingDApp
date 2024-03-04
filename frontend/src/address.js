@@ -1,0 +1,1 @@
+export const LendingDapp = "0xB5FBE0d5aE9143Fc9e47ce7e0b432c1555F0cF2D";
