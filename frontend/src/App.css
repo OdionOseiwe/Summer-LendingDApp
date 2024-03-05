@@ -1,0 +1,337 @@
+*{
+  margin: 0;
+  padding: 0;
+  font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  font-weight: 100;
+  color: #fff;
+
+}
+
+.Body {
+  background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
+  height: 70vh;
+  padding: 20px;
+  padding-bottom: 20px;
+  padding-left: 100px;
+  padding-right: 100px;
+  padding-right: 50%;
+
+  .Body__Title{
+    font-weight: 500;
+    font-size: 80px;
+    line-height: 1.2;
+
+  }
+
+  .Body__description{
+    line-height: 1.7;
+    font-size: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    font-weight: 500;
+    margin-bottom: 30px;
+  }
+
+  .Body__Crypto{
+    color: rgb(44, 38, 230);
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+
+}
+
+.Header{
+  background-color: rgb(2, 2, 28);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  padding-bottom: 20px;
+  padding-left: 100px;
+  padding-right: 100px;
+}
+
+.Nav{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 20px;
+
+
+  .nav__logo{
+    margin-right: 25px;
+    color: rgb(44, 38, 230);
+    font-weight: 600;
+    font-size: 30px;
+    text-decoration: none;
+  }
+
+  .nav__docs{
+    margin-right: 25px;
+    text-decoration: none;
+  }
+
+  .nav__Community{
+    margin-right: 25px;
+    text-decoration: none;
+  }
+}
+
+.Footer{
+  display: flex;
+  padding: 40px;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 25px;
+  font-weight: 500;
+  background-color:rgb(44, 38, 230);
+}
+
+.Community{
+  background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
+  text-align: center;
+  font-size: 25px;
+  height: 100vh;
+  padding: 30px;
+}
+
+.Docs{
+  background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
+  text-align: center;
+  font-size: 25px;
+  height: 100vh;
+  padding: 30px;
+
+}
+
+.BorrowLend{
+  /* background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
+  height: 100vh; */
+  background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
+
+
+  .BorrowLend__header{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px;
+  }
+
+  .BorrowLend__heading{
+    font-size: 35px;
+    font-weight: 500;
+    padding-bottom: 20px;
+    color: rgb(44, 38, 230);
+
+  }
+
+  .BorrowLend__des{
+    font-size: 20px;
+    font-weight: 400;
+    color: #ccc;
+  }
+
+  .Assets{
+
+
+    .Asset__lends{
+      display: grid;
+      grid-template-columns: 22% 22% 22%;
+      align-items: center;
+      font-weight: 800;
+      font-size: 18px;
+      padding: 40px;
+    }
+
+    .Asset__supplys,.Asset__APYs,.Asset__tokens, .Asset__borrows{
+      color: rgb(44, 38, 230);
+      font-weight: 500;
+      font-size: 16px;
+
+    }
+
+    .Asset__lend_des{
+      display: grid;
+      grid-template-columns: 22% 22% 22%;
+      padding-left: 40px;
+      padding-right: 40px;
+      font-size: 18px;
+      color: rgb(44, 38, 230);      
+      align-items: center;
+    }
+
+    .Asset__lend_des2{
+      display: grid;
+      grid-template-columns: 20% 20% 20% 20%;
+      font-size: 18px;
+      color: rgb(44, 38, 230);      
+      align-items: center;
+      padding-bottom: 30px; 
+      padding-left: 40px;
+      padding-right: 40px;
+      
+    }
+
+    .Asset__supply{
+      background-color: transparent;
+      padding: 10px;
+      font-size: 20px;
+      border: 1px solid rgb(44, 38, 230);
+      text-align: center;
+      border-radius: 5px;
+      margin: 10px;
+    }
+
+    .Asset__borrow{
+      background-color: transparent;
+      padding: 10px;
+      font-size: 20px;
+      border: 1px solid rgb(44, 38, 230);
+      text-align: center;
+      border-radius: 5px;
+      margin: 10px;
+    }
+  }
+
+  .close{
+    background-color: rgba(0, 0, 0, 0.2);
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    position: absolute;
+    backdrop-filter: blur(5px);
+
+  }
+
+  .modal{
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px;
+    height: 200px;
+    background: rgb(44, 38, 230);
+    color: #ccc;
+    z-index: 10;
+    border-radius: 16px;
+    box-shadow: 0 5px 20px 0 rgba(0, 0, 0, 0.04);
+    padding: 20px;
+
+    .Modal__Lend{
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .modal__supply{
+      margin: 10px;
+      font-size: 18px;
+      text-align: center;
+      border-radius: 5px;
+      font-weight: 500;
+      background-color: rgb(89, 129, 230);
+      padding: 10px;
+      text-decoration: none;
+      border: none;
+    }
+
+    .modal__withdraw{
+      margin: 10px;
+      font-size: 18px;
+      text-align: center;
+      border-radius: 5px;
+      font-weight: 500;
+      background-color: rgb(89, 129, 230);
+      padding: 10px;
+      text-decoration: none;
+      border: none;
+    }
+
+    .modal__withdraw:hover, .modal__supply:hover{
+      cursor: pointer
+    }
+
+    .Modal__action{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .Modal__token{
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    .Modal__input{
+      background-color: rgb(89, 129, 230);
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+  }
+
+  .Asset__supply:hover, .Asset__borrow:hover{
+    cursor: pointer
+
+  }
+}
+
+@media only screen and (min-width:  1000px) {
+  .Assets{
+    display: grid;
+    grid-template-columns: 50% 50%;
+  }
+
+
+.BorrowLend{
+  height: 100vh;
+}
+
+.Body {
+  background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
+  height: 100vh;
+  padding: 20px;
+  padding-bottom: 20px;
+  padding-left: 100px;
+  padding-right: 100px;
+  padding-right: 50%;
+
+}
+
+
+.Body__LaunchApp{
+  background-color:rgb(44, 38, 230) ;
+  padding-top: 25px;
+  padding-bottom: 25px;
+  padding-left: 50px;
+  padding-right: 50px;
+  font-size: 25px;
+  display: inline;
+  border-radius: 5px;
+  text-decoration: none;
+}
+}
+
+/* @media only screen and (min-width:  300px){
+  .Body__LaunchApp{
+    background-color:rgb(44, 38, 230) ;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    padding-left: 30px;
+    padding-right: 30px;
+    font-size: 25px;
+    display: inline;
+    border-radius: 5px;
+    text-decoration: none;
+  }
+
+} */
+
+  
