@@ -99,6 +99,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
             userDeposit[msg.sender][token].rewardDebt = ((userDeposit[msg.sender][token].amount * rewards.rewardPerToken)/1e18);
         }
         emit DEPOSITED(token, msg.sender, amount);
+        IERC20(token).approve(address(this), amount);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
     }
 
@@ -131,13 +132,17 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         userBorrow[msg.sender][token] = 0;
         rewards.allInterestInUSD = (rewards.allInterestInUSD + interest);
         emit REPAYED(token,msg.sender,amount);
+        uSDToken.approve(address(this), amount);
         uSDToken.safeTransferFrom(msg.sender, address(this), amount);
+        updateRewards();
+
     }
 
 
     ///@param token the collateral address of the account
     function liquidate(address token ,address account) external
         tokenallowed(token) addressZero(account){
+        updateRewards();
         require(userBorrow[account][token] > 0, "choose another token to liqudate");
         uint256 collateral = userDeposit[account][token].amount;
         bool allow = liquidateAllowed(collateral,token, account);
@@ -148,6 +153,7 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         userBorrow[account][token] = 0;
         userDeposit[account][token].amount = 0;
         emit LIQUIDATED(token, account, pay);
+        uSDToken.approve(address(this), pay);
         uSDToken.safeTransferFrom(msg.sender, address(this), pay);
         transferFunds(token, collateral);
     }
@@ -170,8 +176,6 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
                 userDeposit[msg.sender][token].rewardDebt = (userDeposit[msg.sender][token].amount * rewards.rewardPerToken) / 1e18;
                 rewards.allInterestInUSD = rewards.allInterestInUSD - pending;
                 transferFunds(address(uSDToken), pending);
-            }else{
-                revert BadDebt("no interest accommulated");
             }
         }
         transferFunds(token,amount);

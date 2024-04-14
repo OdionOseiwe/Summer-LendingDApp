@@ -10,13 +10,16 @@ import "../src/Mock/SummerToken.sol";
 contract MyScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(deployerPrivateKey); 
+        vm.startBroadcast(deployerPrivateKey);
 
         MockPriceFeed mockPriceFeed = new MockPriceFeed();
         MockUSDT mockUSDT = new MockUSDT();
         SummerToken summerToken = new SummerToken();
-        LendingDApp lendingDapp = new LendingDApp(address(mockUSDT));        
+        LendingDApp lendingDapp = new LendingDApp(address(mockUSDT));
 
         vm.stopBroadcast();
     }
 }
+// forge script script/deploy.s.sol:MyScript --rpc-url https://bsc-testnet.publicnode.com \ --etherscan-api-key	ZFKEJHY63XQX835Z3C7MIWVZ5W343EYT5H \ --broadcast --verify --multi -vvvv
+
+

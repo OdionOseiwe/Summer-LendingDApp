@@ -1,1 +1,2 @@
-export const LendingDapp = "0xB5FBE0d5aE9143Fc9e47ce7e0b432c1555F0cF2D";
+export const LendingDapp = "0x29a06Aa484683a423142201b09e98AF39Dc8EBA8";
+export const MockUSDC = "0x97b13B0fc0056139460da0Dd1F485FFC9d663A40";

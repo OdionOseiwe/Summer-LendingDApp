@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import ModalLend from './ModalLend';
 import ModalBorrow from './ModalBorrow'
 import ModalSupply from './ModalSupply'
+import UsersDetails from './UsersDetails';
+import { useReadContract, useAccount } from "wagmi";
 
 
 function BorrowLend() {
@@ -10,6 +12,7 @@ function BorrowLend() {
     const [openB ,setOpenB] = React.useState(false);
     const [openS ,setOpenS] = React.useState(false);
     const [LendAmount, setALendmount] = useState('0.0');
+    const account = useAccount();
 
 
     return (
@@ -29,7 +32,7 @@ function BorrowLend() {
                         <div className="Asset__supplys"></div>
                     </div>
                     <div className="Asset__lends">
-                        <div className="Asset__token">USDT</div>
+                        <div className="Asset__token">USDC</div>
                         <div className="Asset__APY">10%</div>
                         <button className="Asset__supply" onClick={()=>setOpenL(true)}>lend</button>
                         {openL && <ModalLend setOpenL={setOpenL} setALendmount = {setALendmount} />}
@@ -53,6 +56,7 @@ function BorrowLend() {
                     </div>
                 </div>
             </div>
+                {!account.address ? " " : <UsersDetails/>}
             </div>
             
         </> 
