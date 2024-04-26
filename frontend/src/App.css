@@ -3,17 +3,17 @@
   padding: 0;
   font-family: "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
   font-weight: 100;
-  color: #fff;
 }
 
 .Body {
   background-image: linear-gradient(to right, rgb(2, 4, 16), rgb(3, 7, 45));
-  height: 70vh;
   padding: 20px;
   padding-bottom: 20px;
   padding-left: 100px;
   padding-right: 100px;
   padding-right: 50%;
+  height: 71vh;
+  color: #fff;
 
   .Body__Title {
     font-weight: 500;
@@ -35,6 +35,15 @@
     font-weight: 500;
     text-transform: uppercase;
   }
+
+  .Body__LaunchApp {
+    background-color: rgb(44, 38, 230);
+    padding: 30px;
+    font-size: 20px;
+    border-radius: 5px;
+    text-decoration: none;
+    color: #fff;
+  }
 }
 
 .Header {
@@ -46,13 +55,15 @@
   padding-bottom: 20px;
   padding-left: 100px;
   padding-right: 100px;
+  color: #fff;
 }
 
-.Nav {
+.Header nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 20px;
+  color: #fff;
 
   .nav__logo {
     margin-right: 25px;
@@ -65,12 +76,19 @@
   .nav__docs {
     margin-right: 25px;
     text-decoration: none;
+    color: #fff;
   }
 
   .nav__Community {
     margin-right: 25px;
     text-decoration: none;
+    color: #fff;
   }
+}
+
+.Connect_btn {
+  background-color: rgb(2, 2, 28);
+  padding: 20px;
 }
 
 .Footer {
@@ -89,6 +107,7 @@
   font-size: 25px;
   height: 100vh;
   padding: 30px;
+  color: #fff;
 }
 
 .Docs {
@@ -97,11 +116,14 @@
   font-size: 25px;
   height: 100vh;
   padding: 30px;
+  color: #fff;
 }
 
 .BorrowLend {
-  /* background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45));
-  height: 100vh; */
+  color: #fff;
+
+  /* background-image: linear-gradient(to right, rgb(2, 4, 16) , rgb(3, 7, 45)); */
+  height: 100vh;
   background-image: linear-gradient(to right, rgb(2, 4, 16), rgb(3, 7, 45));
 
   .BorrowLend__header {
@@ -109,6 +131,7 @@
     flex-direction: column;
     align-items: center;
     padding: 40px;
+    color: #fff;
   }
 
   .BorrowLend__heading {
@@ -125,9 +148,10 @@
   }
 
   .Assets {
+    color: #fff;
     .Asset__lends {
       display: grid;
-      grid-template-columns: 22% 22% 22%;
+      grid-template-columns: auto auto auto;
       align-items: center;
       font-weight: 800;
       font-size: 18px;
@@ -141,11 +165,12 @@
       color: rgb(44, 38, 230);
       font-weight: 500;
       font-size: 16px;
+
     }
 
     .Asset__lend_des {
       display: grid;
-      grid-template-columns: 22% 22% 22%;
+      grid-template-columns: auto auto auto;
       padding-left: 40px;
       padding-right: 40px;
       font-size: 18px;
@@ -155,7 +180,7 @@
 
     .Asset__lend_des2 {
       display: grid;
-      grid-template-columns: 20% 20% 20% 20%;
+      grid-template-columns: auto auto auto auto;
       font-size: 18px;
       color: rgb(44, 38, 230);
       align-items: center;
@@ -172,6 +197,8 @@
       text-align: center;
       border-radius: 5px;
       margin: 10px;
+      color: #fff;
+
     }
 
     .Asset__borrow {
@@ -182,19 +209,9 @@
       text-align: center;
       border-radius: 5px;
       margin: 10px;
-    }
-  }
+      color: #fff;
 
-  .close {
-    background-color: rgba(0, 0, 0, 0.2);
-    width: 100vw;
-    height: 100vh;
-    z-index: 0;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    position: absolute;
-    backdrop-filter: blur(5px);
+    }
   }
 
   .modal {
@@ -214,6 +231,7 @@
     .Modal__Lend {
       display: flex;
       justify-content: flex-end;
+      color: #fff;
     }
 
     .modal__supply {
@@ -226,6 +244,7 @@
       padding: 10px;
       text-decoration: none;
       border: none;
+      color: #fff;
     }
 
     .modal__withdraw {
@@ -238,6 +257,7 @@
       padding: 10px;
       text-decoration: none;
       border: none;
+      color: #fff;
     }
 
     .modal__withdraw:hover,
@@ -282,34 +302,202 @@
   }
 }
 
+.close {
+  position: relative;
+  top: 0;
+  left: 50%;
+  cursor: pointer;
+  color: #fff;
+}
+
+.menu {
+  display: none;
+  position: absolute;
+  top: 50px;
+  right: 10px;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 2.25rem;
+  height: 2rem;
+  color: #fff;
+}
+
+.menu span {
+  height: 0.4rem;
+  width: 100%;
+  background-color: #fff;
+  border-radius: 0.2rem;
+}
+
 @media only screen and (min-width: 1000px) {
   .Assets {
     display: grid;
-    grid-template-columns: 50% 50%;
+    grid-template-columns: auto auto;
+  }
+}
+
+@media only screen and (max-width: 800px) and (min-width: 600px) {
+  .menu {
+    display: flex;
   }
 
-  .BorrowLend {
-    height: 100vh;
+  .Header nav {
+    display: none;
+    font-size: 20px;
+    flex-direction: column;
+    width: 100%;
+
+    .nav__logo {
+      color: rgb(44, 38, 230);
+      font-weight: 600;
+      font-size: 30px;
+      text-decoration: none;
+      margin-right: 0;
+    }
+
+    .nav__docs {
+      text-decoration: none;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: rgb(44, 38, 230);
+      border-radius: 7px;
+      width: 100%;
+      text-align: center;
+      margin-right: 0;
+    }
+
+    .nav__Community {
+      text-decoration: none;
+      padding: 10px;
+      background-color: rgb(44, 38, 230);
+      border-radius: 7px;
+      width: 100%;
+      text-align: center;
+      margin-right: 0;
+    }
+  }
+
+  .Header {
+    display: flex;
+    padding: 20px;
+  }
+
+  .Header nav.open {
+    display: flex;
+  }
+
+  .Connect_btn {
+    background-color: rgb(2, 2, 28);
+    padding: 20px;
   }
 
   .Body {
-    background-image: linear-gradient(to right, rgb(2, 4, 16), rgb(3, 7, 45));
-    height: 100vh;
+    padding-right: 20px;
+    padding-left: 20px;
+    padding-top: 50px;
+
+    .Body__Title {
+      font-weight: 500;
+      font-size: 60px;
+      line-height: 1.2;
+    }
+
+    .Body__description {
+      font-size: 20px;
+      font-weight: 400;
+    }
+
+    .Body__Crypto {
+      font-weight: 400;
+    }
+  }
+}
+
+@media only screen and (max-width: 599px) {
+  .menu {
+    display: flex;
+  }
+
+  .Header nav {
+    display: none;
+    font-size: 20px;
+    flex-direction: column;
+    width: 100%;
+
+    .nav__logo {
+      color: rgb(44, 38, 230);
+      font-weight: 600;
+      font-size: 30px;
+      text-decoration: none;
+      margin-right: 0;
+    }
+
+    .nav__docs {
+      text-decoration: none;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: rgb(44, 38, 230);
+      border-radius: 7px;
+      width: 100%;
+      text-align: center;
+      margin-right: 0;
+    }
+
+    .nav__Community {
+      text-decoration: none;
+      padding: 10px;
+      background-color: rgb(44, 38, 230);
+      border-radius: 7px;
+      width: 100%;
+      text-align: center;
+      margin-right: 0;
+    }
+  }
+
+  .Header {
+    display: flex;
     padding: 20px;
-    padding-bottom: 20px;
-    padding-left: 100px;
-    padding-right: 100px;
-    padding-right: 50%;
+  }
+
+  .Header nav.open {
+    display: flex;
+  }
+
+  .Connect_btn {
+    background-color: rgb(2, 2, 28);
+    padding: 20px;
+  }
+
+  .Body {
+    padding-right: 20px;
+    padding-left: 20px;
+    padding-top: 50px;
+
+    .Body__Title {
+      font-size: 30px;
+      line-height: 1.2;
+    }
+
+    .Body__description {
+      font-size: 20px;
+      font-weight: 400;
+    }
+
+    .Body__Crypto {
+      font-weight: 400;
+    }
+  }
+
+  .Footer {
+    padding: 10px;
+    font-size: 20px;
   }
 
   .Body__LaunchApp {
-    background-color: rgb(44, 38, 230);
-    padding-top: 25px;
-    padding-bottom: 25px;
-    padding-left: 50px;
-    padding-right: 50px;
-    font-size: 25px;
-    display: inline;
+    padding: 15px;
+    font-size: 20px;
     border-radius: 5px;
     text-decoration: none;
   }
@@ -344,8 +532,7 @@
   font-size: 20px;
 }
 
-
-.SummerUSDBalance{
+.SummerUSDBalance {
   color: blue;
   font-weight: 600;
   font-size: 24px;

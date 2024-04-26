@@ -1,15 +1,11 @@
-import Nav from './nav';
-import Body from './Body';
-import Footer from './footer';
+import Body from "./Body";
 
 function Home() {
-    return ( 
-        <>
-            <Nav/>
-            <Body/>
-            <Footer/>
-        </>
-    );
+  return (
+    <>
+      <Body />
+    </>
+  );
 }
 
 export default Home;

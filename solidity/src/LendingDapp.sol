@@ -255,7 +255,16 @@ contract LendingDApp is Ownable(msg.sender), ReentrancyGuard{
         if(lpSupply > 0){
             rewards.rewardPerToken = (rewards.allInterestInUSD * 1e18/ divisor);
         }
-    } 
+    }
+    
+    function getUserBorrowAmount(address collateral) public view returns(uint256){
+        return userBorrow[msg.sender][collateral];
+    }
+
+       
+    function getUserDepositAmount(address collateral) public view returns(UserDepositContainer memory){
+        return userDeposit[msg.sender][collateral];
+    }
     
 }
 
